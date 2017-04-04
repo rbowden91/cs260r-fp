@@ -68,9 +68,10 @@ Section Cache.
  * represents what's actually on the physical media.
  *)
 
+Definition DiskPlatter : Type := BlockTable.
+
 Definition RawCache : Type := BlockTable.
 
-Definition DiskPlatter : Type := BlockTable.
 Definition DiskCache : Type := list RawCache.
 Definition OSCache : Type := RawCache.
 
@@ -108,7 +109,6 @@ Function DiskPlatter_write (plat : DiskPlatter) (bn : nat) (data : DataBlock):=
  * and returns a new platter. It does not return a new RawCache; use
  * RawCache_empty.
  *)
-Print NatMap.fold.
 
 Definition RawCache_empty := NatMap.empty DataBlock.
 
@@ -228,16 +228,6 @@ Section CacheFacts.
  * Reading returns the latest write.
  *)
 
-Lemma RawCache_read_nonstale:
-   forall rc bn data,
-      RawCache_read (RawCache_write rc bn data) bn = Some data.
-Proof.
-   intros.
-   unfold RawCache_write.
-   unfold RawCache_read.
-   rewrite NatMapFacts.add_eq_o; auto.
-Qed.
-
 Lemma DiskPlatter_read_nonstale:
    forall plat bn data,
       DiskPlatter_read (DiskPlatter_write plat bn data) bn = Some data.
@@ -245,6 +235,16 @@ Proof.
    intros.
    unfold DiskPlatter_write.
    unfold DiskPlatter_read.
+   rewrite NatMapFacts.add_eq_o; auto.
+Qed.
+
+Lemma RawCache_read_nonstale:
+   forall rc bn data,
+      RawCache_read (RawCache_write rc bn data) bn = Some data.
+Proof.
+   intros.
+   unfold RawCache_write.
+   unfold RawCache_read.
    rewrite NatMapFacts.add_eq_o; auto.
 Qed.
 
@@ -283,17 +283,6 @@ Qed.
  * Writing something else doesn't affect reads.
  *)
 
-Lemma RawCache_read_noninterfere:
-   forall rc bn1 bn2 data,
-      bn1 <> bn2 ->
-      RawCache_read (RawCache_write rc bn1 data) bn2 = RawCache_read rc bn2.
-Proof.
-   intros.
-   unfold RawCache_write.
-   unfold RawCache_read.
-   rewrite NatMapFacts.add_neq_o; auto.
-Qed.
-
 Lemma DiskPlatter_read_noninterfere:
    forall plat bn1 bn2 data,
       bn1 <> bn2 ->
@@ -302,6 +291,17 @@ Proof.
    intros.
    unfold DiskPlatter_write.
    unfold DiskPlatter_read.
+   rewrite NatMapFacts.add_neq_o; auto.
+Qed.
+
+Lemma RawCache_read_noninterfere:
+   forall rc bn1 bn2 data,
+      bn1 <> bn2 ->
+      RawCache_read (RawCache_write rc bn1 data) bn2 = RawCache_read rc bn2.
+Proof.
+   intros.
+   unfold RawCache_write.
+   unfold RawCache_read.
    rewrite NatMapFacts.add_neq_o; auto.
 Qed.
 

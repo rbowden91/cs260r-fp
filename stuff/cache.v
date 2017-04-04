@@ -79,32 +79,6 @@ Inductive Cache : Type :=
 .
 
 
-(*
- * Operations on RawCache.
- *
- * RawCache_empty is the empty cache.
- *
- * RawCache_read reads the value for the indicated block, if any.
- *
- * RawCache_write inserts a new block value into the cache,
- * overwriting any value that already exists.
- *
- * RawCache_sync transfers all the blocks to the platter (passed in)
- * and returns a new platter. It does not return a new RawCache; use
- * RawCache_empty.
- *)
-
-Definition RawCache_empty := NatMap.empty DataBlock.
-
-Function RawCache_read (rc : RawCache) (bn : nat) :=
-   NatMap.find bn rc.
-
-Function RawCache_write (rc : RawCache) (bn : nat) (data : DataBlock) :=
-   NatMap.add bn data rc.
-
-Function RawCache_sync (rc : RawCache) (plat : DiskPlatter) :=
-   (* XXX write this *)
-   plat.
 
 (*
  * Operations on DiskPlatter.
@@ -119,6 +93,36 @@ Function DiskPlatter_read (plat : DiskPlatter) (bn : nat) :=
 
 Function DiskPlatter_write (plat : DiskPlatter) (bn : nat) (data : DataBlock):=
    NatMap.add bn data plat.
+
+(*
+ * Operations on RawCache.
+ *
+ * RawCache_empty is the empty cache.
+ *
+ * RawCache_read reads the value for the indicated block, if any.
+ *
+ * RawCache_write inserts a new block value into the cache,
+ * overwriting any value that already exists.
+ *
+ * RawCache_sync transfers all the blocks to the platter (passed in)
+ * and returns a new platter. It does not return a new RawCache; use
+ * RawCache_empty.
+ *)
+Print NatMap.fold.
+
+Definition RawCache_empty := NatMap.empty DataBlock.
+
+Function RawCache_read (rc : RawCache) (bn : nat) :=
+   NatMap.find bn rc.
+
+Function RawCache_write (rc : RawCache) (bn : nat) (data : DataBlock) :=
+   NatMap.add bn data rc.
+
+Function RawCache_sync (rc : RawCache) (plat : DiskPlatter) :=
+    NatMap.fold (fun bn data plat =>
+                   DiskPlatter_write plat bn data) rc plat
+.
+
 
 (*
  * Operations on DiskCache.

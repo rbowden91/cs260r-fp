@@ -1,0 +1,3 @@
+[submodule "CompCert"]
+	path = compcert
+	url = https://github.com/AbsInt/CompCert

@@ -35,3 +35,6 @@ This will take a bit, but you should hopefully only have to do it once.
 
 Now in the toplevel directory, "make" will currently translate all csrc/*.c files to csrc/*.v files and compile them to
 .vo files (so that you can Require Import them). See CminorExample.v for an example of playing with one of these files.
+
+You may still need to separately compile, e.g., SepCancel.v for use in CSL.v. For now, a simple "coqc SepCancel.v"
+handles that.

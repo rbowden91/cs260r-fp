@@ -6,6 +6,9 @@ you'll also want to look for the target prefix for your machine and replace it i
 
 2) git submodule update
 
+(Alternatively, when initially cloning the repo, passing the --recursive clone to git clone will have done these first
+two steps.)
+
 3) Open up compcert/exportclight/ExportClight.ml and change the "let prologue" binding from:
 
 let prologue = "\n\

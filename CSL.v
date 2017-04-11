@@ -352,6 +352,8 @@ Definition resource_invariant_map := MemorySegment.t resource_invariant.
 Definition return_condition := (list val -> mprop).
 Definition block_conditions := list mprop.
 
+
+
 Definition translate_pure (e : expr) (env : LocalEnv.am
 
 (* C should always hold *)

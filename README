@@ -1,0 +1,37 @@
+After cloning repo, we need to compile CompCert. First, be sure you have all the prerequisites mentioned at
+http://compcert.inria.fr/man/manual002.html, including Coq, OCaml, and Menhir. On this manual page, under installation,
+you'll also want to look for the target prefix for your machine and replace it in the ./configure command below.
+
+1) git submodule init
+
+2) git submodule update
+
+3) Open up compcert/exportclight/ExportClight.ml and change the "let prologue" binding from:
+
+let prologue = "\n\
+Require Import Clightdefs.\n\
+\
+Local Open Scope Z_scope.\n\
+\
+"
+
+to:
+
+let prologue = "\n\
+Require Import compcert.exportclight.Clightdefs.\n\
+\
+Local Open Scope Z_scope.\n\
+\
+"
+
+
+This is definitely not the right way of doing this, but it was my quick workaround instead of figuring out coqc.
+
+
+4) cd compcert && ./configure x86_64-macosx && make
+
+This will take a bit, but you should hopefully only have to do it once.
+
+
+Now in the toplevel directory, "make" will currently translate all csrc/*.c files to csrc/*.v files and compile them to
+.vo files (so that you can Require Import them). See CminorExample.v for an example of playing with one of these files.

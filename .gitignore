@@ -5,3 +5,5 @@
 *~
 \#*
 *.aux
+proposal/*.log
+proposal/article.pdf

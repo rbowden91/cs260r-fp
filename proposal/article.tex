@@ -16,6 +16,12 @@
 \usepackage{graphicx}
 \usepackage{url}
 
+% without help, latex sets these characters in the wrong font inside \tt
+\newcommand{\us}{{\tt\char`\_}}
+\newcommand{\bra}{{\tt\char`\{}}
+\newcommand{\ket}{{\tt\char`\}}}
+\newcommand{\bs}{{\tt\char`\\}}
+
 \usepackage{color}
 \newcommand{\XXX}[1]{{\bf\color{red} #1}}
 
@@ -56,18 +62,19 @@ functional correctness of a complete file system, including crash
 recovery, and output C code that can be run in a kernel.
 This is not feasible in the amount of time available.
 
-In order to get something done by the end of the semester we are
+In order to finish something this semester we are
 taking at least the following simplification steps:
 %\begin{itemize}
 %\item
-(a) Trimming the list of file system operations.
+(a) Using a small list of file system operations.\footnote{Currently
+lookup, create, unlink, read, write, truncate, fsync, and sync.}
 %\item
-(b) Working with a model of a file system, in particular one where
-      blocks can store Coq data structures rather than just bytes.
+(b) Working with a model of a file system; in particular, allowing
+      blocks to store Coq data structures directly.
 %\item
-(c) Not proving anything about liveness.
+(c) Ignoring liveness.
 %\item
-(d) Probably, admitting portions of the non-crash functional
+(d) Probably, admitting non-crash portions of the functional
       correctness proofs.
 %\end{itemize}
 
@@ -93,13 +100,20 @@ further as needed to preserve the core goals.
 % development? If you cannot prove the capstone theorem, what simpler
 % theorems are you more likely to be able to prove?
 
+There are two things we want to prove.
+One is correctness, specifically crash correctness; the other is
+serializability.
+
 For crash correctness, the proof for each file system operation is a
-proof of its corresponding Hoare triple.
-In order to make things manageable, we want to maintain all the
-abstractions that kernel hackers use to keep their code sane.
-Thus at the level of talking to the file system, the correctness of
-operations like e.g. \texttt{write} should be written in terms of
-a trace over (all) time of the operations on that file.
+proof of its corresponding Hoare triple, including a proof of the
+crash condition.
+%In order to make things manageable, we want to maintain all the
+%abstractions that kernel hackers use to keep their code sane.
+%Thus
+At the level of talking to the file system,
+operations on files like e.g. \texttt{write} should be specified in
+terms of a traces of file operations.
+(These can then be shown to be a refinement of lower-level traces.)
 Such a trace can be written
 
 {\coqsize
@@ -114,30 +128,7 @@ Such a trace can be written
         j <= length(ops) -> file_trace j ops.
 \end{verbatim}
 }
-
-In this form \texttt{j} is the index of the operation currently
-guaranteed to be on disk.
-Now, the Hoare triple for \texttt{write} can be written as
-
-{\coqsize
-\begin{verbatim}
-   forall f j ops bytes len,
-   {{ trace_of_file f = file_trace j ops }}
-   write f bytes len
-   {{ trace_of_file f =
-        file_trace j (ops ++ [FileWrite bytes len]) }}
-\end{verbatim}
-}
-and for \texttt{fsync},
-{\coqsize
-\begin{verbatim}
-   forall f j ops,
-   {{ trace_of_file f = file_trace j ops }}
-   fsync f
-   {{ trace_of_file f = file_trace (length ops) ops }}
-\end{verbatim}
-}
-The crash condition of a file trace is:
+which has this crash condition:
 {\coqsize
 \begin{verbatim}
    forall f j ops,
@@ -147,22 +138,31 @@ The crash condition of a file trace is:
    {{ trace_of_file f = file_trace k (take k ops) }}
 \end{verbatim}
 }
-We promise to retain events up through \texttt{j} and may
-retain more.
 
-Proving this requires showing that the file traces are a refinement of
-block-level traces that are hidden within the file system abstraction.
+The last operation guaranteed to be on disk is \texttt{j}
+but we may retain more than that in a crash.
+The Hoare triples for \texttt{write} and \texttt{fsync} can be written
+as
 
-The complete correctness theorem is:
-\begin{itemize}
-\item for each operation (currently lookup, create, read, write,
-truncate, unlink, fsync, sync) prove its Hoare triple;
-\item for each operation prove that crashing respects the crash
-condition;
-\item and prove that operations executed in parallel are serializable.
-\end{itemize}
+{\coqsize
+\begin{verbatim}
+   forall f j ops bytes len,
+   {{ trace_of_file f = file_trace j ops }}
+   write f bytes len
+   {{ trace_of_file f =
+        file_trace j (ops ++ [FileWrite bytes len]) }}
 
-The serializability theorem:
+   forall f j ops,
+   {{ trace_of_file f = file_trace j ops }}
+   fsync f
+   {{ trace_of_file f = file_trace (length ops) ops }}
+\end{verbatim}
+}
+
+The complete correctness theorem is \texttt{/\bs} over all the file
+system operations.
+Serializability:
+
 {\coqsize
 \begin{verbatim}
    Inductive vfsop: Set := ...

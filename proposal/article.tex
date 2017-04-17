@@ -93,40 +93,50 @@ operations like e.g. \texttt{write} should be written in terms of
 a trace over (all) time of the operations on that file.
 
 That trace can be written
+{\tiny
 \begin{verbatim}
    Inductive fileop: Set :=
-   | FileWrite: bytes (*data+length*) -> nat (*offset*) -> fileop
+   | FileWrite: bytes(*data+length*) ->
+       nat (*offset*) -> fileop
    | FileTruncate: nat (*filesize*) -> fileop
    end.
 
    Inductive file_trace nat (list fileop) :=
-      FileTrace => forall j ops: j <= length(ops) -> file_trace j ops.
+      FileTrace => forall j ops:
+        j <= length(ops) -> file_trace j ops.
 \end{verbatim}
+}
 In this form \texttt{j} is the index of the operation guaranteed at
 this point to be on disk.
 Now, the Hoare triple for \texttt{write} can be written as
+{\tiny
 \begin{verbatim}
    forall f j ops bytes len,
    {{ trace_of_file f = file_trace j ops }}
    write f bytes len
    {{ trace_of_file f = file_trace j (ops ++ [FileWrite bytes len]) }}
 \end{verbatim}
+}
 and for \texttt{fsync},
+{\tiny
 \begin{verbatim}
    forall f j ops,
    {{ trace_of_file f = file_trace j ops }}
    fsync f
    {{ trace_of_file f = file_trace (length ops) ops }}
 \end{verbatim}
+}
 
 The crash condition of a file trace is
+{\tiny
 \begin{verbatim}
    forall f j ops,
-   exists k, j <= k /\ k <= length ops),
+   exists k, j <= k /\ k <= length ops,
    {{ trace_of_file f = file_trace j ops }}
    crash
    {{ trace_of_file f = file_trace k (take k ops) }}
 \end{verbatim}
+}
 that is, we promise to retain events up through \texttt{j} and may
 retain more.
 
@@ -143,6 +153,7 @@ condition;
 \end{itemize}
 
 The serializability theorem looks something like this:
+{\tiny
 \begin{verbatim}
    Inductive vfsop: Set := ...
    Inductive vfsexecution: Set :=
@@ -150,9 +161,12 @@ The serializability theorem looks something like this:
    | VfsSeq: vfsexecution -> vfsexecution -> vfsexecution
    | VfsPar: vfsexecution -> vfsexecution -> vfsexecution
    end.
-   Inductive Serial: vfsexecution -> Prop := ...  (* has no VfsPar *)
-   Definition Serializes: vfsexecution -> vfsexecution -> Prop := ...
-   Definition Equivalent: vfsexecution -> vfsexecution -> Prop := ...
+   Inductive Serial:
+        vfsexecution -> Prop := ...  (* has no VfsPar *)
+   Definition Serializes: vfsexecution -> vfsexecution ->
+                          Prop := ...
+   Definition Equivalent: vfsexecution -> vfsexecution ->
+                          Prop := ...
 
    Theorem vfs_serializable:
       forall execution,
@@ -161,6 +175,7 @@ The serializability theorem looks something like this:
          Serial execution' /\
          Serializes execution execution'.
 \end{verbatim}
+}
 
 \texttt{Serializes} is like \texttt{Permutation} but more complicated,
 so it's not immediately clear up front how best to represent it.
@@ -175,7 +190,35 @@ all files.
 % What is your division of labor? Who?s doing what? How can you work
 % in parallel?
 
-\XXX{damn good question someone fill this in}
+There are three separate goals that will be split amongst the three team
+members:
+
+\begin{enumerate}
+    \item Writing the file system (David)
+
+    \item Proving the file system is correct according to our concurrent crash hoare
+logic (Rob)
+
+    \item Proving that the concurrent crash hoare logic is sound (Eric)
+\end{enumerate}
+
+It is likely that these assignments will not be strict, given that they are not
+likely to be of equal size.
+
+There are four weeks remaining before the deadline of May 8th. The goal for the
+first two weeks is to have a ``proof of concept'' working, whereby a single
+operation is verified correct under a very simplified file system model. This
+includes concurrency, asynchronous write back caching, write ahead logging, and
+recovery.
+
+Then, for the third week, we will work on verifying the remaining operations.
+At this point, ideally the concurrent crash hoare logic will have been proven
+sound, so Eric can move to proving things about the file system. Hopefully, the
+proof of concept will provide a template for which the remaining operations can
+be verified.
+
+Finally, with all of the operations verified individually, in the final week we
+aim to prove the serializability of operations run in parallel.
 
 \section{Future Work}
 
@@ -216,7 +259,6 @@ And of course, one should prove liveness, since without that it's
 correct to just fail after every crash.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 %{
 %\footnotesize
 %\bibliographystyle{abbrv}

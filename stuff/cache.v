@@ -68,10 +68,9 @@ Section Cache.
  * represents what's actually on the physical media.
  *)
 
-Definition DiskPlatter : Type := BlockTable.
-
 Definition RawCache : Type := BlockTable.
 
+Definition DiskPlatter : Type := BlockTable.
 Definition DiskCache : Type := list RawCache.
 Definition OSCache : Type := RawCache.
 
@@ -89,10 +88,10 @@ Inductive Cache : Type :=
 
 Definition DiskPlatter_empty := NatMap.empty DataBlock.
 
-Function DiskPlatter_read (plat : DiskPlatter) (bn : nat) :=
+Definition DiskPlatter_read (plat : DiskPlatter) (bn : nat) :=
    NatMap.find bn plat.
 
-Function DiskPlatter_write (plat : DiskPlatter) (bn : nat) (data : DataBlock):=
+Definition DiskPlatter_write (plat : DiskPlatter) (bn : nat) (data : DataBlock):=
    NatMap.add bn data plat.
 
 (*
@@ -112,16 +111,15 @@ Function DiskPlatter_write (plat : DiskPlatter) (bn : nat) (data : DataBlock):=
 
 Definition RawCache_empty := NatMap.empty DataBlock.
 
-Function RawCache_read (rc : RawCache) (bn : nat) :=
+Definition RawCache_read (rc : RawCache) (bn : nat) :=
    NatMap.find bn rc.
 
-Function RawCache_write (rc : RawCache) (bn : nat) (data : DataBlock) :=
+Definition RawCache_write (rc : RawCache) (bn : nat) (data : DataBlock) :=
    NatMap.add bn data rc.
 
-Function RawCache_sync (rc : RawCache) (plat : DiskPlatter) :=
-    NatMap.fold (fun bn data plat =>
-                   DiskPlatter_write plat bn data) rc plat
-.
+Definition RawCache_sync (rc : RawCache) (plat : DiskPlatter) :=
+   NatMap.fold (fun bn data plat =>
+                   DiskPlatter_write plat bn data) rc plat.
 
 
 (*
@@ -228,24 +226,27 @@ Section CacheFacts.
  * Reading returns the latest write.
  *)
 
-Lemma DiskPlatter_read_nonstale:
-   forall plat bn data,
-      DiskPlatter_read (DiskPlatter_write plat bn data) bn = Some data.
-Proof.
-   intros.
-   unfold DiskPlatter_write.
-   unfold DiskPlatter_read.
-   rewrite NatMapFacts.add_eq_o; auto.
-Qed.
+Local Hint Unfold RawCache_write RawCache_read.
+Local Hint Unfold DiskPlatter_read DiskPlatter_write.
+Local Hint Unfold OSCache_read OSCache_write.
+Local Hint Resolve NatMapFacts.add_eq_o.
+
 
 Lemma RawCache_read_nonstale:
    forall rc bn data,
       RawCache_read (RawCache_write rc bn data) bn = Some data.
 Proof.
-   intros.
-   unfold RawCache_write.
-   unfold RawCache_read.
-   rewrite NatMapFacts.add_eq_o; auto.
+  autounfold; auto.
+Qed.
+
+Hint Rewrite RawCache_read_nonstale : cache.
+Local Hint Resolve  RawCache_read_nonstale.
+
+Lemma DiskPlatter_read_nonstale:
+   forall plat bn data,
+      DiskPlatter_read (DiskPlatter_write plat bn data) bn = Some data.
+Proof.
+   autounfold; auto.
 Qed.
 
 Lemma DiskCache_read_nonstale:
@@ -253,67 +254,56 @@ Lemma DiskCache_read_nonstale:
       DiskCache_read (DiskCache_write dc bn data) bn = Some data.
 Proof.
    intros.
-   destruct dc; simpl;
-     rewrite RawCache_read_nonstale;
-     auto.
+   destruct dc; simpl; autorewrite with cache; auto.
 Qed.
 
 Lemma OSCache_read_nonstale:
    forall oc bn data,
       OSCache_read (OSCache_write oc bn data) bn = Some data.
 Proof.
-   intros.
-   unfold OSCache_write.
-   unfold OSCache_read.
-   apply RawCache_read_nonstale.
+   auto.
 Qed.
+
+Hint Rewrite OSCache_read_nonstale : cache.
 
 Lemma Cache_read_nonstale:
    forall c bn data,
       Cache_read (Cache_write c bn data) bn = Some data.
 Proof.
-   intros.
-   destruct c.
-   simpl.
-   rewrite OSCache_read_nonstale.
-   auto.
+   destruct c; intros; simpl; autorewrite with cache; auto.
 Qed.
 
 (*
  * Writing something else doesn't affect reads.
  *)
 
-Lemma DiskPlatter_read_noninterfere:
-   forall plat bn1 bn2 data,
-      bn1 <> bn2 ->
-      DiskPlatter_read (DiskPlatter_write plat bn1 data) bn2 = DiskPlatter_read plat bn2.
-Proof.
-   intros.
-   unfold DiskPlatter_write.
-   unfold DiskPlatter_read.
-   rewrite NatMapFacts.add_neq_o; auto.
-Qed.
+Hint Rewrite NatMapFacts.add_neq_o : cache.
 
 Lemma RawCache_read_noninterfere:
    forall rc bn1 bn2 data,
       bn1 <> bn2 ->
       RawCache_read (RawCache_write rc bn1 data) bn2 = RawCache_read rc bn2.
 Proof.
-   intros.
-   unfold RawCache_write.
-   unfold RawCache_read.
-   rewrite NatMapFacts.add_neq_o; auto.
+   intros; autounfold; autorewrite with cache; auto.
 Qed.
+
+Lemma DiskPlatter_read_noninterfere:
+   forall plat bn1 bn2 data,
+      bn1 <> bn2 ->
+      DiskPlatter_read (DiskPlatter_write plat bn1 data) bn2 = DiskPlatter_read plat bn2.
+Proof.
+   intros; autounfold; autorewrite with cache; auto.
+Qed.
+
+Hint Rewrite RawCache_read_noninterfere : cache.
+Local Hint Resolve RawCache_read_noninterfere.
 
 Lemma DiskCache_read_noninterfere:
    forall dc bn1 bn2 data,
       bn1 <> bn2 ->
       DiskCache_read (DiskCache_write dc bn1 data) bn2 = DiskCache_read dc bn2.
 Proof.
-   intros.
-   destruct dc; simpl;
-      rewrite RawCache_read_noninterfere;
-      auto.
+   intros; destruct dc; simpl; autorewrite with cache; auto.
 Qed.
 
 Lemma OSCache_read_noninterfere:
@@ -321,10 +311,6 @@ Lemma OSCache_read_noninterfere:
       bn1 <> bn2 ->
       OSCache_read (OSCache_write oc bn1 data) bn2 = OSCache_read oc bn2.
 Proof.
-   intros.
-   unfold OSCache_write.
-   unfold OSCache_read.
-   apply RawCache_read_noninterfere.
    auto.
 Qed.
 
@@ -333,10 +319,7 @@ Lemma Cache_read_noninterfere:
       bn1 <> bn2 ->
       Cache_read (Cache_write c bn1 data) bn2 = Cache_read c bn2.
 Proof.
-   intros.
-   destruct c.
-   simpl.
-   rewrite OSCache_read_noninterfere; auto.
+   intros; destruct c; simpl; autorewrite with cache; auto.
 Qed.
 
 (*
@@ -346,8 +329,6 @@ Lemma DiskCache_read_writebarrier:
    forall dc bn,
       DiskCache_read (DiskCache_writebarrier dc) bn = DiskCache_read dc bn.
 Proof.
-   intros.
-   simpl.
    auto.
 Qed.
 

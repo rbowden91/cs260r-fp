@@ -1,11 +1,77 @@
-Load test2.
+Require Import csrc.bar.
 
 Require Import compcert.cfrontend.Cshmgen.
+Require Import compcert.exportclight.Clightdefs.
 Require Import compcert.cfrontend.Cminorgen.
 Require Import compcert.common.Errors.
 Require Import List.
 Require Import compcert.backend.Cminor.
 Local Open Scope error_monad_scope.
+
+(* XXX ugh global variables are broken... *)
+
+Definition find_fresh (lst : list ident) : ident :=
+  (1 + fold_right (fun x r => Pos.max x r) 1 lst)%positive.
+
+Fixpoint is_pure_expr (e : Cminor.expr) : bool :=
+  match e with
+  | Cminor.Eunop _ e1 => is_pure_expr e1
+  | Cminor.Ebinop _ e1 e2 => andb (is_pure_expr e1) (is_pure_expr e2)
+  | Cminor.Eload _ _ => false
+  | _ => true
+  end.
+
+(* Should just run this as a translation on the whole program. *)
+(* Annoyingly, fn_params and fn_vars seem to share the same namespace. *)
+Fixpoint purify_ifs_stores_stmt (s : stmt) (fn_vars : list positive) (fn_params : list positive)
+    : (stmt * list positive) :=
+  match s with
+  | Sseq s1 s2 =>
+    let (s1', fn_vars') := purify_ifs_stores_stmt s1 fn_vars fn_params in
+    let (s2', fn_vars'') := purify_ifs_stores_stmt s2 fn_vars' fn_params in
+    (Sseq s1' s2', fn_vars'')
+  | Sstore mc e1 e2 =>
+    (* Better way to do this? *)
+    match (is_pure_expr e1, is_pure_expr e2) with
+    | (true, true) => (s, fn_vars)
+    | (true, false) =>
+      let x := find_fresh (fn_vars ++ fn_params) in
+      (Sseq (Sassign x e2) (Sstore mc e1 (Evar x)), (x::fn_vars))
+    | (false, true) =>
+      let x := find_fresh (fn_vars ++ fn_params) in
+      (Sseq (Sassign x e1) (Sstore mc (Evar x) e2), (x::fn_vars))
+    | (false, false) =>
+      let x := find_fresh (fn_vars ++ fn_params) in
+      let y := find_fresh (x :: fn_vars ++ fn_params) in
+      (Sseq (Sseq (Sassign x e1) (Sassign y e2)) (Sstore mc (Evar x) (Evar y)), (x::y::fn_vars))
+    end
+  | Sifthenelse e s1 s2 =>
+    let (s1', fn_vars') := purify_ifs_stores_stmt s1 fn_vars fn_params in
+    let (s2', fn_vars'') := purify_ifs_stores_stmt s2 fn_vars' fn_params in
+    if is_pure_expr e then (Sifthenelse e s1' s2', fn_vars'')
+    else
+      let x := find_fresh (fn_vars'' ++ fn_params) in
+      (Sseq (Sassign x e) (Sifthenelse (Evar x) s1' s2'), (x::fn_vars''))
+  | Sloop s1 =>
+    let (s1', fn_vars') := purify_ifs_stores_stmt s1 fn_vars fn_params in
+    (Sloop s1', fn_vars')
+  | Sblock s1 =>
+    let (s1', fn_vars') := purify_ifs_stores_stmt s1 fn_vars fn_params in
+    (Sblock s1', fn_vars')
+  | Slabel l s1 =>
+    let (s1', fn_vars') := purify_ifs_stores_stmt s1 fn_vars fn_params in
+    (Slabel l s1', fn_vars')
+  | _ => (s, fn_vars)
+  end.
+
+Definition purify_ifs_stores_func (f : function) : function :=
+  (* Better way to deal with records? *)
+  let (fn_body, fn_vars) := purify_ifs_stores_stmt f.(fn_body) f.(fn_vars) f.(fn_params) in
+  {| fn_sig := f.(fn_sig);
+     fn_params := f.(fn_params);
+     fn_vars := fn_vars;
+     fn_stackspace := f.(fn_stackspace);
+     fn_body := fn_body |}.
 
 
 (* Compile Clight -> C#minor -> Cminor *)
@@ -23,7 +89,7 @@ Qed.
 Definition foo' :=
   do cmp <- cm_prog ;
   match List.filter (fun x => BinPosDef.Pos.eqb (fst x) _bar) cmp.(AST.prog_defs) with
-  | (_, (Gfun (AST.Internal f)))::nil => OK (f)
+  | (_, (Gfun (AST.Internal f)))::nil => OK (purify_ifs_stores_func f)
   | _ => Error (MSG "Couldn't find function" :: nil)
   end.
 
@@ -35,76 +101,13 @@ Qed.
 
 Print foo.
 
-
-Definition find_fresh (l : list ident) : ident :=
-  fold_right (fun x r => Pos.max x r) (1%positive) l.
-
-Fixpoint is_pure_expr (e : Cminor.expr) : bool :=
-  match e with
-  | Cminor.Eunop _ e1 => is_pure_expr e1
-  | Cminor.Ebinop _ e1 e2 => andb (is_pure_expr e1) (is_pure_expr e2)
-  | Cminor.Eload _ _ => false
-  | _ => true
-  end.
-
-(* Should just run this as a translation on the whole program. *)
-
-Fixpoint purify_ifs_stores_stmt (s : stmt) (fn_vars : list positive)
-    : (stmt * list positive) :=
-  match s with
-  | Sseq s1 s2 =>
-    let (s1', fn_vars') := purify_ifs_stores_stmt s1 fn_vars in
-    let (s2', fn_vars'') := purify_ifs_stores_stmt s2 fn_vars' in
-    (Sseq s1' s2', fn_vars'')
-  | Sstore mc e1 e2 =>
-    (* Better way to do this? *)
-    match (is_pure_expr e1, is_pure_expr e2) with
-    | (true, true) => (s, fn_vars)
-    | (true, false) =>
-      let x := find_fresh fn_vars in
-      (Sseq (Sassign x e2) (Sstore mc e1 (Evar x)), (x::fn_vars))
-    | (false, true) =>
-      let x := find_fresh fn_vars in
-      (Sseq (Sassign x e1) (Sstore mc (Evar x) e2), (x::fn_vars))
-    | (false, false) =>
-      let x := find_fresh fn_vars in
-      let y := find_fresh fn_vars in
-      (Sseq (Sseq (Sassign x e1) (Sassign y e2)) (Sstore mc (Evar x) (Evar y)), (x::y::fn_vars))
-    end
-  | Sifthenelse e s1 s2 =>
-    let (s1', fn_vars') := purify_ifs_stores_stmt s1 fn_vars in
-    let (s2', fn_vars'') := purify_ifs_stores_stmt s2 fn_vars' in
-    if is_pure_expr e then (Sifthenelse e s1' s2', fn_vars'')
-    else
-      let x := find_fresh fn_vars'' in
-      (Sseq (Sassign x e) (Sifthenelse (Evar x) s1' s2'), (x::fn_vars''))
-  | Sloop s1 =>
-    let (s1', fn_vars') := purify_ifs_stores_stmt s1 fn_vars in
-    (Sloop s1', fn_vars')
-  | Sblock s1 =>
-    let (s1', fn_vars') := purify_ifs_stores_stmt s1 fn_vars in
-    (Sblock s1', fn_vars')
-  | Slabel l s1 =>
-    let (s1', fn_vars') := purify_ifs_stores_stmt s1 fn_vars in
-    (Slabel l s1', fn_vars')
-  | _ => (s, fn_vars)
-  end.
-
-Print function.
-
-(* XXX How do params work? Different idents? *)
-Definition purify_ifs_stores_func (f : function) : function :=
-  (* Better way to deal with records? *)
-  let (fn_body, fn_vars) := purify_ifs_stores_stmt f.(fn_body) f.(fn_vars) in
-  {| fn_sig := f.(fn_sig);
-     fn_params := f.(fn_params);
-     fn_vars := fn_vars;
-     fn_stackspace := f.(fn_stackspace);
-     fn_body := fn_body |}.
-
-
 Notation "s1 ;; s2" := (Cminor.Sseq s1 s2) (at level 75, right associativity, format
       "'[v' s1 ';;' '/' s2 ']'").
+
+Print foo.
+
+Notation "'IF' e 'THEN' s1 'ELSE' s2" := (Cminor.Sifthenelse e s1 s2) (at level 71, right associativity, format
+      "'IF' '[    ' '//'  e ']' '//' 'THEN' '[    ' '//' s1 ']' '//' 'ELSE' '[    ' '//' s2 ']'").
 
 Print foo.
 
@@ -224,6 +227,19 @@ Notation "[[ 'StackPtr' n + m ]]  := o" :=
 
 Print foo.
 
+Notation "'tmp' t := s" :=
+  (Cminor.Sassign t%positive s) (at level 31, no associativity).
+
+Notation "[[ ( t )  + n  ]]" :=
+  (Eload Mint32 (Ebinop Oaddl (t) (Long_t n))) (at level 29, no associativity).
+
+Notation "x '=C=' y" :=
+  (Ebinop (Ocmp Ceq) (x) (y)) (at level 29, no associativity).
+
+Print cm_prog.
+
+Print foo.
+Print _x.
 Ltac fold_external := fold _my_malloc _my_free _bar.
 
 Lemma blah : exists x, foo = OK x.

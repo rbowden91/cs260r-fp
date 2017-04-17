@@ -1,12 +1,5 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include "foo.h"
-
-void *my_malloc(size_t s);
-void my_free(void *p);
-void my_lock_acquire();
-void my_lock_release();
-void my_fork(void(*foo)());
+#include "external.h"
 
 // What about a program that does something racy on the stack? Storing a stack address
 // in a global variable on the heap or something?

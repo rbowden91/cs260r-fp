@@ -37,6 +37,43 @@
 %
 % What property are you aiming to verify?
 
+We are interested in pursuing file system crash recovery.
+Both the FSCQ and the Yggdrasil logic is single-threaded, so only
+one file system operation can be in progress at once, and FSCQ also
+needs to sync (repeatedly!) during/after each operation.
+We think these restrictions are unfortunate, particularly the latter
+one, and believe we can lift them.
+
+The interesting part of this is verifying the post-crash recovery
+logic and functional correctness in the presence of concurrent
+execution.
+In the all-singing, all-dancing version of this project we verify full
+functional correctness of a complete file system, including crash
+recovery, and output C code that can be run in a kernel.
+This is not feasible in the amount of time available.
+
+In order to get something done by the end of the semester we are
+taking at least the following simplification steps:
+\begin{itemize}
+\item Cutting back the list of file system operations.
+\item Working with a model of a file system, in particular one where
+      blocks can store Coq data structures rather than just bytes.
+\item Not proving anything about liveness.
+\item Probably, admitting portions of the non-crash functional
+      correctness proofs.
+\end{itemize}
+We are prepared to ruthlessly simplify the file system and the model
+further as needed to preserve the core goals.
+
+% current intended set of vnode ops is:
+% lookup, create, read, write, truncate, unlink, fsync
+% maybe same-directory rename
+% plus for fs ops: sync, getroot
+% note no subdirs.
+%
+% we could simplify away getroot and lookup and just
+% pass in inode numbers.
+
 \section{Goals}
 
 % Give a Coq statement of your capstone theorem. This theorem
@@ -47,6 +84,89 @@
 % development? If you cannot prove the capstone theorem, what simpler
 % theorems are you more likely to be able to prove?
 
+For crash correctness, the proof for each file system operation is a
+proof of its corresponding Hoare triple.
+In order to make things manageable, we want to maintain all the
+abstractions that kernel hackers use to keep their code sane.
+Thus at the level of talking to the file system, the correctness of
+operations like e.g. \texttt{write} should be written in terms of
+a trace over (all) time of the operations on that file.
+
+That trace can be written
+\begin{verbatim}
+   Inductive fileop: Set :=
+   | FileWrite: bytes (*data+length*) -> nat (*offset*) -> fileop
+   | FileTruncate: nat (*filesize*) -> fileop
+   end.
+
+   Inductive file_trace nat (list fileop) :=
+      FileTrace => forall j ops: j <= length(ops) -> file_trace j ops.
+\end{verbatim}
+In this form \texttt{j} is the index of the operation guaranteed at
+this point to be on disk.
+Now, the Hoare triple for \texttt{write} can be written as
+\begin{verbatim}
+   forall f j ops bytes len,
+   {{ trace_of_file f = file_trace j ops }}
+   write f bytes len
+   {{ trace_of_file f = file_trace j (ops ++ [FileWrite bytes len]) }}
+\end{verbatim}
+and for \texttt{fsync},
+\begin{verbatim}
+   forall f j ops,
+   {{ trace_of_file f = file_trace j ops }}
+   fsync f
+   {{ trace_of_file f = file_trace (length ops) ops }}
+\end{verbatim}
+
+The crash condition of a file trace is
+\begin{verbatim}
+   forall f j ops,
+   exists k, j <= k /\ k <= length ops),
+   {{ trace_of_file f = file_trace j ops }}
+   crash
+   {{ trace_of_file f = file_trace k (take k ops) }}
+\end{verbatim}
+that is, we promise to retain events up through \texttt{j} and may
+retain more.
+
+Proving this requires showing that the file traces are a refinement of
+block-level traces that are hidden within the file system abstraction.
+
+The complete correctness theorem is:
+\begin{itemize}
+\item for each operation (currently lookup, create, read, write,
+truncate, unlink, fsync, sync) prove its Hoare triple;
+\item for each operation prove that crashing respects the crash
+condition;
+\item and prove that operations executed in parallel are serializable.
+\end{itemize}
+
+The serializability theorem looks something like this:
+\begin{verbatim}
+   Inductive vfsop: Set := ...
+   Inductive vfsexecution: Set :=
+   | VfsOp: vfsop -> vfsexecution
+   | VfsSeq: vfsexecution -> vfsexecution -> vfsexecution
+   | VfsPar: vfsexecution -> vfsexecution -> vfsexecution
+   end.
+   Inductive Serial: vfsexecution -> Prop := ...  (* has no VfsPar *)
+   Definition Serializes: vfsexecution -> vfsexecution -> Prop := ...
+   Definition Equivalent: vfsexecution -> vfsexecution -> Prop := ...
+
+   Theorem vfs_serializable:
+      forall execution,
+      exists execution',
+         Equivalent execution execution' /\
+         Serial execution' /\
+         Serializes execution execution'.
+\end{verbatim}
+
+\texttt{Serializes} is like \texttt{Permutation} but more complicated,
+so it's not immediately clear up front how best to represent it.
+\texttt{Equivalent} should be expressed in terms of file traces over
+all files.
+
 \section{Schedule}
 
 % What is your project schedule? What do you aim to have completed
@@ -55,10 +175,45 @@
 % What is your division of labor? Who?s doing what? How can you work
 % in parallel?
 
+\XXX{damn good question someone fill this in}
+
 \section{Future Work}
 
 % What is your (hypothetical) future work? How could future
 % generations build on your effort?
+
+Everything we don't get done in the course of the semester (toward the
+full version of the project) or that we've simplified away is future
+work: handling bit encoding of file system metadata, supporting
+subdirectories and the full set of directory operations, generating C
+code, generating C code that will fit into a real kernel, etc.
+
+It might be interesting to emit Frama-C notations into the C output to
+allow crosschecking it.
+
+Plus part of the underlying goal is to produce a framework that can be
+used with more than one file system model, so in addition to modeling
+a very basic made-up file system like we're starting with, we might
+model one or more real file systems.
+Proving the recovery theorem in the original FFS paper would be an
+interesting exercise, but possibly maddening since it requires a much
+more relaxed notion of correctness than we're aiming for and that
+increases the complexity.
+
+Also it would be interesting to reason about the complete state of the
+file system as seen by different processes and whether or not the
+state we recover to is consistent with all views, including possibly
+with side channels between processes that induce additional ordering
+constraints.
+
+Then there's the question of different disk models, and different
+degrees of control over the on-disk cache.
+And one could look into proving temporal bounds on data loss.
+One could also try to prove the absence of degenerate performance
+behavior.
+
+And of course, one should prove liveness, since without that it's
+correct to just fail after every crash.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

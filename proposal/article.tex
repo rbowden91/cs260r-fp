@@ -19,6 +19,8 @@
 \usepackage{color}
 \newcommand{\XXX}[1]{{\bf\color{red} #1}}
 
+\newcommand{\coqsize}{\scriptsize}
+
 \title{CS260 Project Proposal}
 \author{Rob Bowden, David Holland, Eric Lu}
 \date{April 17, 2017}
@@ -28,8 +30,8 @@
 
 % we don't have enough space to have an abstract
 % or alternatively, the whole thing is an abstract
-\begin{abstract}
-\end{abstract}
+%\begin{abstract}
+%\end{abstract}
 
 \section{Introduction}
 
@@ -37,12 +39,14 @@
 %
 % What property are you aiming to verify?
 
-We are interested in pursuing file system crash recovery.
+We are interested in
+% pursuing
+file system crash recovery.
 Both the FSCQ and the Yggdrasil logic is single-threaded, so only
 one file system operation can be in progress at once, and FSCQ also
 needs to sync (repeatedly!) during/after each operation.
-We think these restrictions are unfortunate, particularly the latter
-one, and believe we can lift them.
+These restrictions, particularly the latter, are unfortunate
+and we believe we can lift them.
 
 The interesting part of this is verifying the post-crash recovery
 logic and functional correctness in the presence of concurrent
@@ -54,14 +58,19 @@ This is not feasible in the amount of time available.
 
 In order to get something done by the end of the semester we are
 taking at least the following simplification steps:
-\begin{itemize}
-\item Cutting back the list of file system operations.
-\item Working with a model of a file system, in particular one where
+%\begin{itemize}
+%\item
+(a) Trimming the list of file system operations.
+%\item
+(b) Working with a model of a file system, in particular one where
       blocks can store Coq data structures rather than just bytes.
-\item Not proving anything about liveness.
-\item Probably, admitting portions of the non-crash functional
+%\item
+(c) Not proving anything about liveness.
+%\item
+(d) Probably, admitting portions of the non-crash functional
       correctness proofs.
-\end{itemize}
+%\end{itemize}
+
 We are prepared to ruthlessly simplify the file system and the model
 further as needed to preserve the core goals.
 
@@ -91,34 +100,36 @@ abstractions that kernel hackers use to keep their code sane.
 Thus at the level of talking to the file system, the correctness of
 operations like e.g. \texttt{write} should be written in terms of
 a trace over (all) time of the operations on that file.
+Such a trace can be written
 
-That trace can be written
-{\tiny
+{\coqsize
 \begin{verbatim}
    Inductive fileop: Set :=
    | FileWrite: bytes(*data+length*) ->
        nat (*offset*) -> fileop
    | FileTruncate: nat (*filesize*) -> fileop
    end.
-
    Inductive file_trace nat (list fileop) :=
-      FileTrace => forall j ops:
+   | FileTrace: forall j ops:
         j <= length(ops) -> file_trace j ops.
 \end{verbatim}
 }
-In this form \texttt{j} is the index of the operation guaranteed at
-this point to be on disk.
+
+In this form \texttt{j} is the index of the operation currently
+guaranteed to be on disk.
 Now, the Hoare triple for \texttt{write} can be written as
-{\tiny
+
+{\coqsize
 \begin{verbatim}
    forall f j ops bytes len,
    {{ trace_of_file f = file_trace j ops }}
    write f bytes len
-   {{ trace_of_file f = file_trace j (ops ++ [FileWrite bytes len]) }}
+   {{ trace_of_file f =
+        file_trace j (ops ++ [FileWrite bytes len]) }}
 \end{verbatim}
 }
 and for \texttt{fsync},
-{\tiny
+{\coqsize
 \begin{verbatim}
    forall f j ops,
    {{ trace_of_file f = file_trace j ops }}
@@ -126,9 +137,8 @@ and for \texttt{fsync},
    {{ trace_of_file f = file_trace (length ops) ops }}
 \end{verbatim}
 }
-
-The crash condition of a file trace is
-{\tiny
+The crash condition of a file trace is:
+{\coqsize
 \begin{verbatim}
    forall f j ops,
    exists k, j <= k /\ k <= length ops,
@@ -137,7 +147,7 @@ The crash condition of a file trace is
    {{ trace_of_file f = file_trace k (take k ops) }}
 \end{verbatim}
 }
-that is, we promise to retain events up through \texttt{j} and may
+We promise to retain events up through \texttt{j} and may
 retain more.
 
 Proving this requires showing that the file traces are a refinement of
@@ -152,22 +162,21 @@ condition;
 \item and prove that operations executed in parallel are serializable.
 \end{itemize}
 
-The serializability theorem looks something like this:
-{\tiny
+The serializability theorem:
+{\coqsize
 \begin{verbatim}
    Inductive vfsop: Set := ...
-   Inductive vfsexecution: Set :=
-   | VfsOp: vfsop -> vfsexecution
-   | VfsSeq: vfsexecution -> vfsexecution -> vfsexecution
-   | VfsPar: vfsexecution -> vfsexecution -> vfsexecution
+   Inductive vfsx (*execution*): Set :=
+   | VfsOp: vfsop -> vfsx
+   | VfsSeq: vfsx -> vfsx -> vfsx
+   | VfsPar: vfsx -> vfsx -> vfsx
    end.
-   Inductive Serial:
-        vfsexecution -> Prop := ...  (* has no VfsPar *)
-   Definition Serializes: vfsexecution -> vfsexecution ->
-                          Prop := ...
-   Definition Equivalent: vfsexecution -> vfsexecution ->
-                          Prop := ...
-
+   Inductive Serial (*no VfsPar*):
+      vfsx -> Prop := ...
+   Definition Serializes:
+      vfsx -> vfsx -> Prop := ...
+   Definition Equivalent:
+      vfsx -> vfsx -> Prop := ...
    Theorem vfs_serializable:
       forall execution,
       exists execution',
@@ -196,14 +205,14 @@ members:
 \begin{enumerate}
     \item Writing the file system (David)
 
-    \item Proving the file system is correct according to our concurrent crash hoare
-logic (Rob)
+    \item Proving the file system is correct according to our
+concurrent crash Hoare logic (Rob)
 
-    \item Proving that the concurrent crash hoare logic is sound (Eric)
+    \item Proving that the concurrent crash Hoare logic is sound (Eric)
 \end{enumerate}
 
-It is likely that these assignments will not be strict, given that they are not
-likely to be of equal size.
+These assignments will not be strict, given that the tasks are not
+of equal size.
 
 There are four weeks remaining before the deadline of May 8th. The goal for the
 first two weeks is to have a ``proof of concept'' working, whereby a single
@@ -212,7 +221,7 @@ includes concurrency, asynchronous write back caching, write ahead logging, and
 recovery.
 
 Then, for the third week, we will work on verifying the remaining operations.
-At this point, ideally the concurrent crash hoare logic will have been proven
+At this point, ideally the concurrent crash Hoare logic will have been proven
 sound, so Eric can move to proving things about the file system. Hopefully, the
 proof of concept will provide a template for which the remaining operations can
 be verified.
@@ -234,7 +243,7 @@ code, generating C code that will fit into a real kernel, etc.
 It might be interesting to emit Frama-C notations into the C output to
 allow crosschecking it.
 
-Plus part of the underlying goal is to produce a framework that can be
+An underlying goal is to produce a framework that can be
 used with more than one file system model, so in addition to modeling
 a very basic made-up file system like we're starting with, we might
 model one or more real file systems.
@@ -246,7 +255,7 @@ increases the complexity.
 Also it would be interesting to reason about the complete state of the
 file system as seen by different processes and whether or not the
 state we recover to is consistent with all views, including possibly
-with side channels between processes that induce additional ordering
+with side channels inducing additional ordering
 constraints.
 
 Then there's the question of different disk models, and different

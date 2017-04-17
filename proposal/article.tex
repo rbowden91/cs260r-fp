@@ -223,11 +223,13 @@ recovery.
 Then, for the third week, we will work on verifying the remaining operations.
 At this point, ideally the concurrent crash Hoare logic will have been proven
 sound, so Eric can move to proving things about the file system. Hopefully, the
-proof of concept will provide a template for which the remaining operations can
+proof of concept will provide a template from which the remaining operations can
 be verified.
 
 Finally, with all of the operations verified individually, in the final week we
-aim to prove the serializability of operations run in parallel.
+aim to prove the serializability of operations run in parallel. There are enough
+pieces that we hope to be able to get \textit{something} verified, even if it
+means cutting multiple operations and features.
 
 \section{Future Work}
 
@@ -252,17 +254,15 @@ interesting exercise, but possibly maddening since it requires a much
 more relaxed notion of correctness than we're aiming for and that
 increases the complexity.
 
-Also it would be interesting to reason about the complete state of the
+It would be interesting to reason about the complete state of the
 file system as seen by different processes and whether or not the
 state we recover to is consistent with all views, including possibly
 with side channels inducing additional ordering
 constraints.
 
-Then there's the question of different disk models, and different
-degrees of control over the on-disk cache.
-And one could look into proving temporal bounds on data loss.
-One could also try to prove the absence of degenerate performance
-behavior.
+Then there's the question of different disk models, and different degrees of
+control over the on-disk cache.  One could look into proving temporal bounds on
+data loss and could also try to prove the absence of degenerate performance.
 
 And of course, one should prove liveness, since without that it's
 correct to just fail after every crash.

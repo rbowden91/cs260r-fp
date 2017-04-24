@@ -47,9 +47,8 @@ Proof.
   unfold write_spec; intros; unfold write.
   step.
   instantiate (2:=fst vnode_invariant).
-  instantiate (1:=(fun _ => snd vnode_invariant)).
+  instantiate (1:=(fun _ => (snd vnode_invariant * (exists v0 : vnode, addr |-> HVnode v0)))%sep).
+  apply HtWeaken with (P:=(emp * exists v0 : vnode, addr |-> HVnode v0)%sep).
+  apply HtFrame with (R:=(exists v0 : vnode, addr |-> HVnode v0)%sep).
   step.
-  step.
-  
-  step.
-Qed.
+  cancel.

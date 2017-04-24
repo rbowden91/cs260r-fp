@@ -5,7 +5,7 @@ SRCS=stringfacts.v base.v ast.v logic.v vfs.v all.v
 
 .SUFFIXES: .v .vo
 
-all: all.vo
+all: $(SRCS:.v=.vo)
 
 .v.vo:
 	$(COQC) $<

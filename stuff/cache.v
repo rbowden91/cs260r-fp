@@ -26,8 +26,11 @@ Module NatMapFacts := FMapFacts.WFacts_fun Nat_as_OT NatMap.
 Section DataBlocks.
 
 Inductive DataBlock : Type :=
+(*
 | UserData: forall (userfilenum fileblocknum generation : nat), DataBlock
 | FSData: forall T : Type, forall metadata : T, DataBlock
+*)
+| DNat (n:nat)
 .
 
 (*

@@ -1,0 +1,33 @@
+title slide
+   roosterfs (?)
+   a filesystem using crash concurrent separation hoare logic
+
+parts of the problem
+   crash concurrent separation hoare logic
+   soundness proof of same
+   a file system specification
+   a file system
+   a proof of the file system
+
+logic
+   we thought pulling together the logic wouldn't be that big a deal
+   we were wrong
+
+rob talks here
+
+file system specification
+   david spend a while flailing trying to figure out how to write down
+   things without having the logic ready
+   and especially the ast that goes with the logic
+
+david exhibits the current specs here
+
+file system
+   writing this is substantially more dependent on the ast and logic
+   david has some stuff but it's not ready to be exhibited
+
+proofs
+   we have bupkis so far, pretty much
+
+conclusions
+   ?

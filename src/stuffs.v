@@ -50,7 +50,7 @@ Inductive Lock: Type :=
 (* variables are named with strings *)
 Inductive Var: Type -> option Lock -> Type :=
 | var: forall t, string -> t -> Var t None
-| lockedvar t (name : string) l: Var t l
+| lockedvar t (name : string) (l : Lock): Var t (Some l)
 .
 
 (*

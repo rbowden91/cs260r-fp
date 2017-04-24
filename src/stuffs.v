@@ -4,6 +4,12 @@ Require Import String.
 Require Import List.
 Import ListNotations.
 
+Require Import OrderedType OrderedTypeEx.
+Require FMapList.
+Require FMapFacts.
+Module NatMap := FMapList.Make Nat_as_OT.
+Module NatMapFacts := FMapFacts.WFacts_fun Nat_as_OT NatMap.
+
 Require Import stringfacts.
 
 (* ************************************************************ *)
@@ -216,6 +222,12 @@ Proof.
    omega.
 Defined.
 
+Definition filetrace_empty: file_trace.
+Proof.
+   refine (FileTrace 0 [] _).
+   omega.
+Defined.
+
 End filetraces.
 
 Section dirtraces.
@@ -260,7 +272,21 @@ Proof.
    omega.
 Defined.
 
+Definition dirtrace_sync (t : dir_trace): dir_trace.
+Proof.
+   destruct t.
+   refine (DirTrace (length ops) ops _).
+   omega.
+Defined.
+
+Definition dirtrace_empty: dir_trace.
+Proof.
+   refine (DirTrace 0 [] _).
+   omega.
+Defined.
+
 End dirtraces.
+
 
 (*
  * vfs objects
@@ -270,6 +296,8 @@ Section vfsobjects.
 
 Class vnodeclass (vnode : Type) := {
   inum_of_vnode: vnode -> nat;
+  isdir: vnode -> bool;
+  isfile: vnode -> bool;
   dirtrace_of_vnode: vnode -> dir_trace;
   filetrace_of_vnode: vnode -> file_trace;
 
@@ -305,7 +333,8 @@ Class vnodeclass (vnode : Type) := {
             match retvn with
                | Some rvn => (
                     dirtrace_of_vnode dir = dirtrace_append t (DirCreate name ino) /\
-                    inum_of_vnode rvn = ino
+                    inum_of_vnode rvn = ino /\
+                    filetrace_of_vnode rvn = filetrace_empty
                  )
                | None =>
                     dirtrace_of_vnode dir = t
@@ -367,13 +396,75 @@ Class vnodeclass (vnode : Type) := {
            filetrace_of_vnode file = filetrace_sync t);
 }.
 
+Section tracetable.
+
+Inductive trace_table: Type :=
+| TraceTable: NatMap.t dir_trace -> NatMap.t file_trace -> trace_table
+.
+
+Definition tracetable_dirprop {vnt : Type} {q: vnodeclass vnt}
+                              (vn: vnt) (dtbl: NatMap.t dir_trace) (p : dir_trace -> Prop) :=
+   forall t,
+   isdir vn = true -> NatMap.find (inum_of_vnode vn) dtbl = Some t -> p t.
+
+Definition tracetable_fileprop {vnt : Type} {q: vnodeclass vnt}
+                               (vn : vnt) (ftbl: NatMap.t file_trace) (p: file_trace -> Prop) :=
+   forall t,
+   isfile vn = true -> NatMap.find (inum_of_vnode vn) ftbl = Some t -> p t.
+
+Definition tracetable_has {vnt : Type} {q : vnodeclass vnt}
+                          (vn: vnt) ttbl: Prop :=
+   match ttbl with
+   | TraceTable dtbl ftbl =>
+        (tracetable_dirprop vn dtbl (fun t => dirtrace_of_vnode vn = t)) \/
+        (tracetable_fileprop vn ftbl (fun t => filetrace_of_vnode vn = t))
+   end.
+
+Definition tracetable_apply {vnt: Type} {q: vnodeclass vnt}
+                            (vn: vnt) df ff ttbl: Prop :=
+   match ttbl with
+   | TraceTable dtbl ftbl =>
+        (tracetable_dirprop vn dtbl (fun t => dirtrace_of_vnode vn = df t)) \/
+        (tracetable_fileprop vn ftbl (fun t => filetrace_of_vnode vn = ff t))
+   end.
+
+End tracetable.
+
+
 Class fsclass (vfs : Type) := {
   vnode: Type;
   vnode_is_vnodeclass: vnodeclass vnode;
 
+  root_inum: nat;
+  getvnode: nat -> vnode;
+
   VFS_GETROOT: Proc vfs vnode;
+  getroot_spec:
+     ProcHoare
+        vfs vnode
+        (fun fs => True)
+        VFS_GETROOT
+        (fun fs rootvn => inum_of_vnode rootvn = root_inum);
+
   VFS_SYNC: Proc vfs unit;
-  newfs: Proc unit unit;
+  sync_spec: forall ttbl,
+     ProcHoare
+        vfs unit
+        (fun fs => forall inum vn,
+            getvnode inum = vn -> tracetable_has vn ttbl)
+        VFS_SYNC
+        (fun fs _ => forall inum vn,
+           getvnode inum = vn -> tracetable_apply vn dirtrace_sync filetrace_sync ttbl);
+
+  newfs: Proc unit vfs;
+  newfs_spec:
+     ProcHoare
+        unit vfs
+        (fun _ => True)
+        newfs
+        (fun fs _ => forall inum vn,
+           getvnode inum = vn -> inum = root_inum /\
+           dirtrace_of_vnode vn = dirtrace_empty);
 }.
 
 End vfsobjects.

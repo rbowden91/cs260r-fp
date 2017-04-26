@@ -195,6 +195,7 @@ Class vnodeclass (vnode : Type) := {
      ProcHoare
         (vnode * string) (option vnode)
         (fun arg => let (dir, name) := arg in
+            isdir dir = true /\
             dirtrace_of_vnode dir = t)
         (VOP_LOOKUP)
         (fun arg retvn => let (dir, name) := arg in
@@ -211,6 +212,7 @@ Class vnodeclass (vnode : Type) := {
      ProcHoare
         (vnode * string) (option vnode)
         (fun arg => let (dir, name) := arg in
+            isdir dir = true /\
             dirtrace_of_vnode dir = t)
         (VOP_CREATE)
         (fun arg retvn => let (dir, name) := arg in
@@ -230,6 +232,7 @@ Class vnodeclass (vnode : Type) := {
      ProcHoare
         (vnode * string) (option unit)
         (fun arg => let (dir, name) := arg in
+            isdir dir = true /\
             dirtrace_of_vnode dir = t)
         VOP_UNLINK
         (fun arg ret => let (dir, name) := arg in
@@ -244,6 +247,7 @@ Class vnodeclass (vnode : Type) := {
      ProcHoare
         (vnode * nat * nat) bytes
         (fun arg => let (arg', offset) := arg in let (file, len) := arg' in
+           isfile file = true /\
            filetrace_of_vnode file = t)
         VOP_READ
         (fun arg ret => let (arg', offset) := arg in let (file, len) := arg' in
@@ -254,6 +258,7 @@ Class vnodeclass (vnode : Type) := {
      ProcHoare
         (vnode * bytes * nat) unit
         (fun arg => let (arg', offset) := arg in let (file, data) := arg' in
+           isfile file = true /\
            filetrace_of_vnode file = t)
         VOP_WRITE
         (fun arg ret => let (arg', offset) := arg in let (file, data) := arg' in
@@ -264,6 +269,7 @@ Class vnodeclass (vnode : Type) := {
      ProcHoare
         (vnode * nat) unit
         (fun arg => let (file, size) := arg in
+           isfile file = true /\
            filetrace_of_vnode file = t)
         VOP_TRUNCATE
         (fun arg ret => let (file, size) := arg in
@@ -274,6 +280,7 @@ Class vnodeclass (vnode : Type) := {
      ProcHoare
         vnode unit
         (fun file =>
+           isfile file = true /\
            filetrace_of_vnode file = t)
         VOP_FSYNC
         (fun file ret =>
@@ -320,7 +327,7 @@ Class fsclass (vfs : Type) := {
   vnode_is_vnodeclass: vnodeclass vnode;
 
   root_inum: nat;
-  getvnode: nat -> vnode;
+  getvnode: vfs -> nat -> vnode;
 
   VFS_GETROOT: Proc vfs vnode;
   getroot_spec:
@@ -328,17 +335,19 @@ Class fsclass (vfs : Type) := {
         vfs vnode
         (fun fs => True)
         VFS_GETROOT
-        (fun fs rootvn => inum_of_vnode rootvn = root_inum);
+        (fun fs rootvn => inum_of_vnode rootvn = root_inum /\
+           isdir rootvn = true);
 
   VFS_SYNC: Proc vfs unit;
   sync_spec: forall ttbl,
      ProcHoare
         vfs unit
         (fun fs => forall inum vn,
-            getvnode inum = vn -> tracetable_has vn ttbl)
+            getvnode fs inum = vn -> tracetable_has vn ttbl)
         VFS_SYNC
         (fun fs _ => forall inum vn,
-           getvnode inum = vn -> tracetable_apply vn dirtrace_sync filetrace_sync ttbl);
+           getvnode fs inum = vn ->
+              tracetable_apply vn dirtrace_sync filetrace_sync ttbl);
 
   newfs: Proc unit vfs;
   newfs_spec:
@@ -346,8 +355,8 @@ Class fsclass (vfs : Type) := {
         unit vfs
         (fun _ => True)
         newfs
-        (fun fs _ => forall inum vn,
-           getvnode inum = vn -> inum = root_inum /\
+        (fun _ fs => forall inum vn,
+           getvnode fs inum = vn -> inum = root_inum /\
            dirtrace_of_vnode vn = dirtrace_empty);
 }.
 

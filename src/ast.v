@@ -16,15 +16,24 @@ Import ListNotations.
  * abstract syntax the code is written in
  *)
 
+(* XXX remove this *)
+Definition s_prop := nat.
+
+Definition addr := nat.
+
+Inductive Invariant : Type -> Type :=
+(* Just an example *)
+| nat_inv : (s_prop * s_prop) -> Invariant nat
+.
+
 (* locks are a special class of variables *)
-Inductive Lock: Type :=
-| lock: string -> Lock
+Inductive Lock: Type -> Type :=
+| lock : forall t, Invariant t -> Lock t
 .
 
 (* variables are named with strings *)
-Inductive Var: Type -> option Lock -> Type :=
-| var: forall t, string -> t -> Var t None
-| lockedvar t (name : string) (l : Lock): Var t (Some l)
+Inductive Var: Type -> Type :=
+| var: forall t, string -> t -> Var t
 .
 
 (*
@@ -32,31 +41,33 @@ Inductive Var: Type -> option Lock -> Type :=
  *)
 Inductive Expr: Type -> Type :=
 | value: forall t, t -> Expr t
-| read: forall t l, Var t l -> Expr t
+| read: forall t, Var t -> Expr t
 | cond: forall t, Expr bool -> Expr t -> Expr t -> Expr t
-with
+.
 
 (*
  * statements don't
  *)
-(*Inductive*) Stmt: Type :=
+Inductive Stmt: Type :=
 | block: list Stmt -> Stmt
-| start: Stmt -> Stmt
-| assign: forall t l, Var t l -> Expr t -> Stmt
+| start: forall pt rt, Proc pt rt -> Expr pt -> Stmt
+| assign: forall t, Var t -> Expr t -> Stmt
+| load: forall t, Var t -> Expr addr -> Stmt
+| store: forall t, Expr addr -> Expr t -> Stmt
 | if_: Expr bool -> Stmt -> Stmt -> Stmt
 | while: Expr bool -> Stmt -> Stmt
-| call: forall pt rt l, Var rt l -> Proc pt rt -> Expr pt -> Stmt
-| local: forall t, Var t None -> Stmt
+| call: forall pt rt, Var rt -> Proc pt rt -> Expr pt -> Stmt
+| local: forall t, Var t -> Stmt
 | return_: forall t, Expr t -> Stmt
-| getlock: Lock -> Stmt
-| putlock: Lock -> Stmt
+| getlock: forall t, Lock t -> Stmt
+| putlock: forall t, Lock t -> Stmt
 with
 
 (*
  * procs both take and produce values
  *)
 (*Inductive*) Proc: Type -> Type -> Type :=
-| proc: forall pt rt, Var pt None -> Stmt -> Proc pt rt
+| proc: forall pt rt, Var pt -> Stmt -> Proc pt rt
 .
 
 
@@ -79,46 +90,50 @@ Definition skip: Stmt := block nil.
  *)
 
 (* check that variable declarations are unique *)
-Inductive StmtDeclaresVar: forall t l, Stmt -> Var t l -> bool -> Prop :=
-| block_declares_var_nil: forall t l v,
-     StmtDeclaresVar t l (block []) v false
-| block_declares_var_cons_here: forall t l s ss v,
-     StmtDeclaresVar t l s v true -> StmtDeclaresVar t l (block ss) v false ->
-     StmtDeclaresVar t l (block (s :: ss)) v true
-| block_declares_var_cons_nothere: forall t l s ss v b,
-     StmtDeclaresVar t l s v false -> StmtDeclaresVar t l (block ss) v b ->
-     StmtDeclaresVar t l (block (s :: ss)) v b
-| start_declares_var: forall t l s v b,
-     StmtDeclaresVar t l s v b ->
-     StmtDeclaresVar t l (start s) v b
-| assign_declares_var: forall t' l' t l v e v',
-     StmtDeclaresVar t' l' (assign t l v e) v' false
-| if_declares_var: forall t l e s1 s2 v b1 b2,
-     StmtDeclaresVar t l s1 v b1 -> StmtDeclaresVar t l s2 v b2 ->
-     StmtDeclaresVar t l (if_ e s1 s2) v (b1 || b2)
-| while_declares_var: forall t l e s v b,
-     StmtDeclaresVar t l s v b ->
-     StmtDeclaresVar t l (while e s) v b
-| call_declares_var: forall t' l' pt rt v p e v' b,
-     ProcDeclaresVar t' l' pt rt p v' b ->
-     StmtDeclaresVar t' l' (call pt rt None v p e) v' b
+Inductive StmtDeclaresVar: forall t, Stmt -> Var t -> bool -> Prop :=
+| block_declares_var_nil: forall t v,
+     StmtDeclaresVar t (block []) v false
+| block_declares_var_cons_here: forall t s ss v,
+     StmtDeclaresVar t s v true -> StmtDeclaresVar t (block ss) v false ->
+     StmtDeclaresVar t (block (s :: ss)) v true
+| block_declares_var_cons_nothere: forall t s ss v b,
+     StmtDeclaresVar t s v false -> StmtDeclaresVar t (block ss) v b ->
+     StmtDeclaresVar t (block (s :: ss)) v b
+| start_declares_var: forall t s v b pt rt p e,
+     StmtDeclaresVar t s v b ->
+     StmtDeclaresVar t (start pt rt p e) v false
+| assign_declares_var: forall t' t e e' v',
+     StmtDeclaresVar t' (assign t e e') v' false
+| load_declares_var: forall t' t v e v',
+     StmtDeclaresVar t' (load t v e) v' false
+| store_declares_var: forall t' t v e v',
+     StmtDeclaresVar t' (store t v e) v' false
+| if_declares_var: forall t e s1 s2 v b1 b2,
+     StmtDeclaresVar t s1 v b1 -> StmtDeclaresVar t s2 v b2 ->
+     StmtDeclaresVar t (if_ e s1 s2) v (b1 || b2)
+| while_declares_var: forall t e s v b,
+     StmtDeclaresVar t s v b ->
+     StmtDeclaresVar t (while e s) v b
+| call_declares_var: forall t' pt rt v p e v' b,
+     ProcDeclaresVar t' pt rt p v' b ->
+     StmtDeclaresVar t' (call pt rt v p e) v' b
 | local_declares_var: forall t v,
-     StmtDeclaresVar t None (local t v) v true
-| return_declares_var: forall t' l' t e v',
-     StmtDeclaresVar t' l' (return_ t e) v' false
+     StmtDeclaresVar t (local t v) v true
+| return_declares_var: forall t' t e v',
+     StmtDeclaresVar t' (return_ t e) v' false
 with
-(*Inductive*) ProcDeclaresVar: forall t l pt rt, Proc pt rt -> Var t l -> bool -> Prop :=
+(*Inductive*) ProcDeclaresVar: forall t pt rt, Proc pt rt -> Var t -> bool -> Prop :=
 | proc_declares_var_arg: forall pt rt s v,
-     StmtDeclaresVar pt None s v false ->
-     ProcDeclaresVar pt None pt rt (proc pt rt v s) v true
+     StmtDeclaresVar pt s v false ->
+     ProcDeclaresVar pt pt rt (proc pt rt v s) v true
 | proc_declares_var_nonarg_sametype: forall pt rt s v' v b,
-     StmtDeclaresVar pt None s v b ->
+     StmtDeclaresVar pt s v b ->
      v <> v' ->
-     ProcDeclaresVar pt None pt rt (proc pt rt v' s) v b
-| proc_declares_var_nonarg_othertype: forall t l pt rt s v' v b,
-     StmtDeclaresVar t l s v b ->
-     t <> pt \/ l = None ->
-     ProcDeclaresVar t l pt rt (proc pt rt v' s) v b
+     ProcDeclaresVar pt pt rt (proc pt rt v' s) v b
+| proc_declares_var_nonarg_othertype: forall t pt rt s v' v b,
+     StmtDeclaresVar t s v b ->
+     t <> pt ->
+     ProcDeclaresVar t pt rt (proc pt rt v' s) v b
 .
 
 (* check that variable uses are after declarations *)
@@ -129,7 +144,9 @@ Inductive StmtLooseVars: forall t, Stmt -> list (Var t) -> Prop :=
 | (* TBD *)
 *)
 
+
 (* check that procedure returns are ok *)
+
 Inductive StmtEndsInReturn: Stmt -> Type -> Prop :=
 | block_ends_in_return: forall ss t e,
      StmtEndsInReturn (block (ss ++ [return_ t e])) t
@@ -146,7 +163,7 @@ with
 .
 
 Definition StmtOk s : Prop :=
-   (forall t l v (b : bool), StmtDeclaresVar t l s v b) /\
+   (forall t v (b : bool), StmtDeclaresVar t s v b) /\
    (* (forall t, StmtLooseVars t s []) *) True.
 
 Inductive ProcOk: forall pt rt, Proc pt rt -> Prop :=

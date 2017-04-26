@@ -52,8 +52,8 @@ Inductive Stmt: Type :=
 | block: list Stmt -> Stmt
 | start: forall pt rt, Proc pt rt -> Expr pt -> Stmt
 | assign: forall t, Var t -> Expr t -> Stmt
-| load: forall t, Var t -> Expr addr -> Stmt
-| store: forall t, Expr addr -> Expr t -> Stmt
+| load: forall t, Var t -> Lock t -> Stmt
+| store: forall t, Lock t -> Expr t -> Stmt
 | if_: Expr bool -> Stmt -> Stmt -> Stmt
 | while: Expr bool -> Stmt -> Stmt
 | call: forall pt rt, Var rt -> Proc pt rt -> Expr pt -> Stmt

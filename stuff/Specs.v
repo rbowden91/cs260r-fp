@@ -40,7 +40,9 @@ Definition write (heap_addr : nat) (block_num : nat) (v : diskval) : cmd nat :=
   end.
 
 Definition write_spec :=
-  forall addr bnum v, invariants ||- {{emp}} {{exists v, addr |-> HVnode v}} write addr bnum v {{emp}} {{_ ~> emp}}.
+  forall addr bnum v, invariants ||- {{emp}} {{exists v, addr |-> HVnode v}} 
+                                        write addr bnum v
+                                     {{emp}} {{_ ~> emp}}.
 
 Lemma write_ok : write_spec.
 Proof.

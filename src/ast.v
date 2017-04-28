@@ -33,7 +33,7 @@ Inductive Lock: Type -> Type :=
 
 (* variables are named with strings *)
 Inductive Var: Type -> Type :=
-| var: forall t, string -> t -> Var t
+| var: forall t, (*string*) nat -> Var t
 .
 
 (*

@@ -50,14 +50,14 @@ Inductive Expr: Type -> Type :=
  *)
 Inductive Stmt: Type :=
 | block: list Stmt -> Stmt
-| start: forall pt rt, Proc pt rt -> Expr pt -> Stmt
+| start: forall pt, Proc pt unit -> Expr pt -> Stmt
 | assign: forall t, Var t -> Expr t -> Stmt
 | load: forall t, Var t -> Lock t -> Stmt
 | store: forall t, Lock t -> Expr t -> Stmt
 | if_: Expr bool -> Stmt -> Stmt -> Stmt
 | while: Expr bool -> Stmt -> Stmt
 | call: forall pt rt, Var rt -> Proc pt rt -> Expr pt -> Stmt
-| local: forall t, Var t -> Stmt
+| local: forall t, Var t -> Expr t -> Stmt
 | return_: forall t, Expr t -> Stmt
 | getlock: forall t, Lock t -> Stmt
 | putlock: forall t, Lock t -> Stmt
@@ -99,9 +99,9 @@ Inductive StmtDeclaresVar: forall t, Stmt -> Var t -> bool -> Prop :=
 | block_declares_var_cons_nothere: forall t s ss v b,
      StmtDeclaresVar t s v false -> StmtDeclaresVar t (block ss) v b ->
      StmtDeclaresVar t (block (s :: ss)) v b
-| start_declares_var: forall t s v b pt rt p e,
+| start_declares_var: forall t s v b pt p e,
      StmtDeclaresVar t s v b ->
-     StmtDeclaresVar t (start pt rt p e) v false
+     StmtDeclaresVar t (start pt p e) v false
 | assign_declares_var: forall t' t e e' v',
      StmtDeclaresVar t' (assign t e e') v' false
 | load_declares_var: forall t' t v e v',
@@ -117,8 +117,8 @@ Inductive StmtDeclaresVar: forall t, Stmt -> Var t -> bool -> Prop :=
 | call_declares_var: forall t' pt rt v p e v' b,
      ProcDeclaresVar t' pt rt p v' b ->
      StmtDeclaresVar t' (call pt rt v p e) v' b
-| local_declares_var: forall t v,
-     StmtDeclaresVar t (local t v) v true
+| local_declares_var: forall t v e,
+     StmtDeclaresVar t (local t v e) v true
 | return_declares_var: forall t' t e v',
      StmtDeclaresVar t' (return_ t e) v' false
 with

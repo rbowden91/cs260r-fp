@@ -53,14 +53,12 @@ Qed.
 
 Definition read {t} {hint: t} (x: var t) (env: localenv) (P: localenv_sound env): option t.
 destruct x.
-refine (
-        match StringMap.find name env with
-        | Some (mkvalue t' (mkvar _ name') a) => Some (launder t' t a _)
-        | None => None
-        end
-   
-)
-.
+   refine (
+      match StringMap.find name env with
+      | Some (mkvalue t' (mkvar _ name') a) => Some (launder t' t a _)
+      | None => None
+      end
+   ).
 Proof.
 apply (foo t' t env name (mkvar t' name)); auto.
 Defined.

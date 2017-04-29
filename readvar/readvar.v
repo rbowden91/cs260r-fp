@@ -63,8 +63,7 @@ Proof.
    destruct H as [a' H].
    apply H in H0.
    rewrite H1 in H0.
-   injection H0; intros.
-   apply H3.
+   injection H0; auto.
 Qed.
 
 Definition read {t} (x: var t)

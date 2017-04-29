@@ -14,9 +14,9 @@ Module StringMap := FMapList.Make String_as_OT.
 Module StringMapFacts := FMapFacts.WFacts_fun String_as_OT StringMap.
 
 
-Inductive var (t: Type): Type := mkvar (name : string): var t.
+Inductive var (t: Set): Set := mkvar (name : string): var t.
 
-Inductive value: Type := mkvalue (t: Type) (a : t): value.
+Inductive value: Type := mkvalue (t: Set) (a : t): value.
 
 Definition localenv := StringMap.t value.
 
@@ -37,7 +37,7 @@ Definition localenv_sound (env: localenv) (prog : program): Prop :=
        (StringMap.find name env = Some (mkvalue t a)).
 
 Lemma localenv_weaken (env: localenv) (prog: program):
-   forall (t : Type) name,
+   forall (t : Set) name,
       localenv_sound env prog ->
       in_program t (mkvar t name) prog ->
       StringMap.find name env = None -> False.
@@ -52,7 +52,7 @@ Proof.
 Qed.
 
 Lemma localenv_weaken2 (env: localenv) (prog: program):
-   forall (t : Type) name,
+   forall (t : Set) name,
       localenv_sound env prog ->
       in_program t (mkvar t name) prog ->
       (forall t' a, StringMap.find name env = Some (mkvalue t' a) -> t' = t).
@@ -70,7 +70,7 @@ Definition read {t} (x: var t)
                 (env: localenv) (prog: program)
                 (P: localenv_sound env prog)
                 (P1: in_program t x prog)
-           : option t.
+           : t.
 Proof.
    destruct x.
    remember (StringMap.find name env) as Q.
@@ -81,10 +81,36 @@ Proof.
           with (t := t) (name := name) (t' := t0) (a := a); auto.
      * clear HeqQ.
        rewrite H in a.
-       refine (Some a).
+       refine a.
    - symmetry in HeqQ.
      apply localenv_weaken with (t := t) (name := name) in P; auto.
      contradiction.
 Defined.
 Check read.
 
+Inductive SoundResultEnv (prog : program) :=
+| result (e : localenv) (P : localenv_sound e prog) : SoundResultEnv prog.
+
+Definition write {t} (x: var t) (a: t)
+                 (env: localenv) (prog: program)
+                 (P: localenv_sound env prog)
+                 (P1: in_program t x prog)
+           : SoundResultEnv prog.
+Proof.
+  destruct x.
+  apply (result prog (StringMap.add name (mkvalue t a) env)).
+  unfold localenv_sound in *.
+  intros.
+  destruct (string_dec name name0).
+  - rewrite e in *.
+    rewrite StringMapFacts.add_eq_o; auto.
+    admit.
+    (* XXX: we aren't guaranteed that the type we're assigning was the old type there *)
+    (* eventually in_program t ... /\ in_program t0 ... had better imply t = t0 *)
+  - specialize (P t0 name0).
+    destruct P as [a0 H].
+    exists a0.
+    intros.
+    apply H in H0.
+    rewrite StringMapFacts.add_neq_o; auto.
+Admitted.

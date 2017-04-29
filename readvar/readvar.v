@@ -34,8 +34,7 @@ Inductive in_program: forall t, var t -> program -> Prop :=
 Definition localenv_sound (env: localenv) (prog : program): Prop :=
    forall t name, exists a,
       in_program t (mkvar t name) prog ->
-       (StringMap.find name env = Some (mkvalue t a)) /\
-       (forall t', in_program t' (mkvar t' name) prog -> t = t').
+       (StringMap.find name env = Some (mkvalue t a)).
 
 Lemma localenv_weaken (env: localenv) (prog: program):
    forall (t : Type) name,
@@ -48,7 +47,6 @@ Proof.
    specialize H with (t := t) (name := name).
    destruct H as [a H].
    apply H in H0.
-   destruct H0 as [H0 _].
    rewrite H1 in H0.
    discriminate.
 Qed.
@@ -64,11 +62,11 @@ Proof.
    specialize H with (t := t) (name := name).
    destruct H as [a' H].
    apply H in H0.
-   destruct H0 as [H0 _].
    rewrite H1 in H0.
    congruence.
 Admitted.
 
+(*
 Lemma read_some:
    forall t env prog name,
       localenv_sound env prog ->
@@ -82,7 +80,7 @@ Proof.
      exists (mkvalue t x).
      auto.
 Qed.
-
+*)
 (*
 Lemma foo (t : Type) (t' : Type):
    forall env prog (name : string),
@@ -111,12 +109,13 @@ Proof.
    congruence.
 Admitted.
 *)
-
+(*
 Definition launder (t1 t2: Type) (x : t1) (k: t1 = t2): t2.
 Proof.
    rewrite k in x.
    auto.
 Qed.
+*)
 
 Definition read {t} (x: var t)
                 (env: localenv) (prog: program)

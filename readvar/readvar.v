@@ -63,8 +63,9 @@ Proof.
    destruct H as [a' H].
    apply H in H0.
    rewrite H1 in H0.
-   congruence.
-Admitted.
+   injection H0; intros.
+   apply H3.
+Qed.
 
 Definition read {t} (x: var t)
                 (env: localenv) (prog: program)

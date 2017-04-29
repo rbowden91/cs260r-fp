@@ -45,9 +45,9 @@ Proof.
    congruence.
 Admitted.
 
-Definition launder (t1 t2: Type) (x : t1) (k: t2 = t1): t2.
+Definition launder (t1 t2: Type) (x : t1) (k: t1 = t2): t2.
 Proof.
-   rewrite <- k in x.
+   rewrite k in x.
    auto.
 Qed.
 
@@ -62,6 +62,6 @@ refine (
 )
 .
 Proof.
-apply (foo t t' env name (mkvar t name)); auto.
+apply (foo t' t env name (mkvar t' name)); auto.
 Defined.
 Check read.

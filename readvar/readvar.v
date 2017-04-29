@@ -66,57 +66,6 @@ Proof.
    congruence.
 Admitted.
 
-(*
-Lemma read_some:
-   forall t env prog name,
-      localenv_sound env prog ->
-      in_program t (mkvar t name) prog ->
-      exists v, StringMap.find name env = Some v.
-Proof.
-   intros.
-   induction H with (t := t) (name := name).
-   - apply H1 in H0.
-     destruct H0 as [H0 H2].
-     exists (mkvalue t x).
-     auto.
-Qed.
-*)
-(*
-Lemma foo (t : Type) (t' : Type):
-   forall env prog (name : string),
-      localenv_sound env prog ->
-      in_program t (mkvar t name) prog ->
-      t = t'.
-Proof.
-   intros env prog name S IN.
-   assert (exists v, StringMap.find name env = Some v).
-   apply read_some with (t := t) (prog := prog); auto.
-   destruct H as [v H].
-   destruct v.
-   unfold localenv_sound in S.
-   specialize S with (t := t') (name := name).
-   destruct S as [a' S].
-   apply S in IN.
-
-   unfold localenv_sound in S.
-   remember S as S'; clear HeqS'.
-   specialize S with (t := t) (name := name).
-   specialize S' with (t := t') (name := name).
-   destruct S as [a S]; destruct S' as [a' S'].
-   apply S in IN.
-   apply S' in IN'.
-   rewrite IN' in IN.
-   congruence.
-Admitted.
-*)
-(*
-Definition launder (t1 t2: Type) (x : t1) (k: t1 = t2): t2.
-Proof.
-   rewrite k in x.
-   auto.
-Qed.
-*)
-
 Definition read {t} (x: var t)
                 (env: localenv) (prog: program)
                 (P: localenv_sound env prog)

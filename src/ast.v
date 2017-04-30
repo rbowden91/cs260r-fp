@@ -21,26 +21,26 @@ Definition s_prop := nat.
 
 Definition addr := nat.
 
-Inductive Invariant : Type -> Type :=
+Inductive Invariant : Set -> Type :=
 (* Just an example *)
 | nat_inv : (s_prop * s_prop) -> Invariant nat
 .
 
 (* locks are a special class of variables *)
-Inductive Lock: Type -> Type :=
+Inductive Lock: Set -> Type :=
 | lock : forall t, Invariant t -> Lock t
 .
 
 (* variables are named with strings *)
-Inductive Var: Type -> Type :=
-| var: forall t, (*string*) nat -> Var t
+Inductive Var: Set -> Type :=
+| var: forall t, string -> Var t
 .
 
 (*
  * expressions produce values
  *)
-Inductive Expr: Type -> Type :=
-| value: forall t, t -> Expr t
+Inductive Expr: Set -> Type :=
+| value: forall (t : Set), t -> Expr t
 | read: forall t, Var t -> Expr t
 | cond: forall t, Expr bool -> Expr t -> Expr t -> Expr t
 .
@@ -50,13 +50,13 @@ Inductive Expr: Type -> Type :=
  *)
 Inductive Stmt: Type :=
 | block: list Stmt -> Stmt
-| start: forall pt, Proc pt unit -> Expr pt -> Stmt
+| start: forall (pt : Set), Proc pt unit -> Expr pt -> Stmt
 | assign: forall t, Var t -> Expr t -> Stmt
 | load: forall t, Var t -> Lock t -> Stmt
 | store: forall t, Lock t -> Expr t -> Stmt
 | if_: Expr bool -> Stmt -> Stmt -> Stmt
 | while: Expr bool -> Stmt -> Stmt
-| call: forall pt rt, Var rt -> Proc pt rt -> Expr pt -> Stmt
+| call: forall (pt : Set) rt, Var rt -> Proc pt rt -> Expr pt -> Stmt
 | local: forall t, Var t -> Expr t -> Stmt
 | return_: forall t, Expr t -> Stmt
 | getlock: forall t, Lock t -> Stmt
@@ -75,7 +75,7 @@ with
  * Extended/sugary AST forms
  *)
 
-Definition coqcall {ta tr} (f : ta -> tr) (x : ta): Expr tr :=
+Definition coqcall {ta tr : Set} (f : ta -> tr) (x : ta): Expr tr :=
    value tr (f x)
 .
 
@@ -114,7 +114,7 @@ Inductive StmtDeclaresVar: forall t, Stmt -> Var t -> bool -> Prop :=
 | while_declares_var: forall t e s v b,
      StmtDeclaresVar t s v b ->
      StmtDeclaresVar t (while e s) v b
-| call_declares_var: forall t' pt rt v p e v' b,
+| call_declares_var: forall t' (pt rt : Set) v p e v' b,
      ProcDeclaresVar t' pt rt p v' b ->
      StmtDeclaresVar t' (call pt rt v p e) v' b
 | local_declares_var: forall t v e,
@@ -156,11 +156,128 @@ Inductive StmtEndsInReturn: Stmt -> Type -> Prop :=
 | return_ends_in_return: forall t e,
      StmtEndsInReturn (return_ t e) t
 with
-(*Inductive*) ProcReturnOk: forall pt rt, Proc pt rt -> Prop :=
+(*Inductive*) ProcReturnOk: forall (pt : Set) rt, Proc pt rt -> Prop :=
 | proc_return_ok: forall pt rt v s,
      StmtEndsInReturn s rt ->
      ProcReturnOk pt rt (proc pt rt v s)
 .
+
+
+(* variable gets read by an expression *)
+Inductive InExpr : forall t, Var t -> Expr t -> Prop :=
+| inexpr_read : forall t v,
+    InExpr t v (read t v)
+| inexpr_cond : forall t v b e1 e2,
+    InExpr t v e1 -> InExpr t v e2 -> InExpr t v (cond t b e1 e2)
+.
+
+(* variable gets used in a statement *)
+Inductive InStmt : forall t, Var t -> Stmt -> Prop :=
+| instmt_block_front : forall t v st sts,
+    InStmt t v st -> InStmt t v (block (st :: sts))
+| instmt_block_cons : forall t v st sts,
+    InStmt t v (block sts) -> InStmt t v (block (st :: sts))
+| instmt_start : forall t v p e,
+    InExpr t v e -> InStmt t v (start t p e)
+| instmt_assign_var : forall t v e,
+    InStmt t v (assign t v e)
+| instmt_assign_expr : forall t v v' e,
+    InExpr t v e -> InStmt t v (assign t v' e)
+| instmt_load : forall t v l,
+    InStmt t v (load t v l)
+| instmt_store : forall t v l e,
+    InExpr t v e -> InStmt t v (store t l e)
+| instmt_if_cond : forall v b s1 s2,
+    InExpr bool v b -> InStmt bool v (if_ b s1 s2)
+| instmt_if_body_1 : forall t v b s1 s2,
+    InStmt t v s1 -> InStmt t v (if_ b s1 s2)
+| instmt_if_body_2 : forall t v b s1 s2,
+    InStmt t v s2 -> InStmt t v (if_ b s1 s2)
+| instmt_while_cond : forall v b s,
+    InExpr bool v b -> InStmt bool v (while b s)
+| instmt_while_body : forall t v b s,
+    InStmt t v s -> InStmt t v (while b s)
+| instmt_call_var : forall t v pt p e,
+    InStmt t v (call pt t v p e)
+| instmt_call_expr : forall t v rt v' p e,
+    InExpr t v e -> InStmt t v (call t rt v' p e)
+| instmt_local_var : forall t v e,
+    InStmt t v (local t v e)
+| instmt_local_expr : forall t v v' e,
+    InExpr t v e -> InStmt t v (local t v' e)
+| instmt_return : forall t v e,
+    InExpr t v e -> InStmt t v (return_ t e)
+(* XXX it's never in getlock or putlock? *)
+.
+(* inspect to see that the constructor types were inferred properly *)
+(* Print InStmt. *)
+
+(* XXX assuming the env for the proc and statement are separate,
+   so variable use in a proc doesn't contaminate the calling statement whatsoever *)
+(* Inductive InProc := . *)
+
+(* does this expression respect the usage of varname s to denote a type t? *)
+Inductive ExprVarRespectsT (t : Set) (s : string) : forall t', Expr t' -> Prop :=
+| evrt_value : forall t' exp,
+    ExprVarRespectsT t s t' (value t' exp)
+| evrt_read_eq : (* expr type had better be the same *)
+    ExprVarRespectsT t s t (read t (var t s))
+| evrt_read_neq : forall t' s', (* don't care about expr type *)
+    s <> s' -> ExprVarRespectsT t s t' (read t' (var t' s'))
+| evrt_cond : forall t' b exp1 exp2,
+    ExprVarRespectsT t s bool b -> ExprVarRespectsT t s t' exp1 -> ExprVarRespectsT t s t' exp2 ->
+    ExprVarRespectsT t s t' (cond t' b exp1 exp2)
+.
+
+(* does this statement respect the usage of varname s to denote a type t? *)
+(* XXX note that in both of these, non-usage counts as respectful! *)
+Inductive StmtVarRespectsT (t : Set) (s : string) : Stmt -> Prop :=
+| svrt_block_nil : StmtVarRespectsT t s (block [])
+| svrt_block_cons : forall st sts,
+    StmtVarRespectsT t s st -> StmtVarRespectsT t s (block sts) ->
+    StmtVarRespectsT t s (block (st :: sts))
+| svrt_start : forall pt p e,
+    ExprVarRespectsT t s pt e -> StmtVarRespectsT t s (start pt p e)
+| svrt_assign_eq : forall e,
+    ExprVarRespectsT t s t e -> StmtVarRespectsT t s (assign t (var t s) e)
+| svrt_assign_neq : forall t' s' e,
+    s <> s' -> ExprVarRespectsT t s t' e -> StmtVarRespectsT t s (assign t' (var t' s') e)
+| svrt_load_eq : forall l,
+    StmtVarRespectsT t s (load t (var t s) l)
+| svrt_load_neq : forall t' s' l,
+    s <> s' -> StmtVarRespectsT t s (load t' (var t' s') l)
+| svrt_if : forall b s1 s2,
+    ExprVarRespectsT t s bool b -> StmtVarRespectsT t s s1 -> StmtVarRespectsT t s s2 ->
+    StmtVarRespectsT t s (if_ b s1 s2)
+| svrt_while : forall b st,
+    ExprVarRespectsT t s bool b -> StmtVarRespectsT t s st -> StmtVarRespectsT t s (while b st)
+| svrt_call_eq : forall pt p exp,
+    ExprVarRespectsT t s pt exp -> StmtVarRespectsT t s (call pt t (var t s) p exp)
+| svrt_call_neq : forall t' s' pt p exp,
+    s <> s' -> ExprVarRespectsT t s pt exp -> StmtVarRespectsT t s (call pt t' (var t' s') p exp)
+| svrt_local_eq : forall e,
+    ExprVarRespectsT t s t e -> StmtVarRespectsT t s (local t (var t s) e)
+| svrt_local_neq : forall t' s' e,
+    s <> s' -> ExprVarRespectsT t s t' e -> StmtVarRespectsT t s (local t' (var t' s') e)
+| svrt_return : forall t' e,
+    ExprVarRespectsT t s t' e -> StmtVarRespectsT t s (return_ t' e)
+(* XXX *)
+| svrt_getlock : forall t' l,
+    StmtVarRespectsT t s (getlock t' l)
+| svrt_putlock : forall t' l,
+    StmtVarRespectsT t s (putlock t' l)
+.
+(* inspect to see that the constructor types were inferred properly *)
+(* Print StmtVarRespectsT. *)
+
+(* does a proc respect variable usage? *)
+Inductive ProcVarRespectsT (pt : Set) (rt : Set) : Proc pt rt -> Prop :=
+| pvrt : forall s st,
+    StmtVarRespectsT pt s st ->
+    (forall t s, InStmt t (var t s) st -> StmtVarRespectsT t s st) ->
+    ProcVarRespectsT pt rt (proc pt rt (var pt s) st)
+.
+
 
 Definition StmtOk s : Prop :=
    (forall t v (b : bool), StmtDeclaresVar t s v b) /\

@@ -270,12 +270,15 @@ Inductive StmtVarRespectsT (t : Set) (s : string) : Stmt -> Prop :=
 (* inspect to see that the constructor types were inferred properly *)
 (* Print StmtVarRespectsT. *)
 
+Definition StmtRespectful (st: Stmt) :=
+  forall t s, InStmt t (var t s) st -> StmtVarRespectsT t s st.
+
 (* does a proc respect variable usage? *)
-Inductive ProcVarRespectsT (pt : Set) (rt : Set) : Proc pt rt -> Prop :=
+Inductive ProcRespectful (pt : Set) (rt : Set) : Proc pt rt -> Prop :=
 | pvrt : forall s st,
     StmtVarRespectsT pt s st ->
-    (forall t s, InStmt t (var t s) st -> StmtVarRespectsT t s st) ->
-    ProcVarRespectsT pt rt (proc pt rt (var pt s) st)
+    StmtRespectful st ->
+    ProcRespectful pt rt (proc pt rt (var pt s) st)
 .
 
 

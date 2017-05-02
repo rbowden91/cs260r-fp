@@ -15,3 +15,4 @@ Require Import base.
 Require Import ast.
 Require Import logic.
 Require Import vfs.
+Require Import semantics.

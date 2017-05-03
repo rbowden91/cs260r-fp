@@ -212,7 +212,7 @@ Inductive InStmt : forall t, Var t -> Stmt -> Prop :=
 (* inspect to see that the constructor types were inferred properly *)
 (* Print InStmt. *)
 
-(* XXX assuming the env for the proc and statement are separate,
+(* assuming the env for the proc and statement are separate,
    so variable use in a proc doesn't contaminate the calling statement whatsoever *)
 (* Inductive InProc := . *)
 
@@ -230,7 +230,7 @@ Inductive ExprVarRespectsT (t : Set) (s : string) : forall t', Expr t' -> Prop :
 .
 
 (* does this statement respect the usage of varname s to denote a type t? *)
-(* XXX note that in both of these, non-usage counts as respectful! *)
+(* note that in both of these, non-usage counts as respectful! *)
 Inductive StmtVarRespectsT (t : Set) (s : string) : Stmt -> Prop :=
 | svrt_block_nil : StmtVarRespectsT t s (block [])
 | svrt_block_cons : forall st sts,
@@ -270,8 +270,7 @@ Inductive StmtVarRespectsT (t : Set) (s : string) : Stmt -> Prop :=
 (* inspect to see that the constructor types were inferred properly *)
 (* Print StmtVarRespectsT. *)
 
-Definition StmtRespectful (st: Stmt) :=
-  forall t s, InStmt t (var t s) st -> StmtVarRespectsT t s st.
+Definition StmtRespectful (st: Stmt) := forall t s, StmtVarRespectsT t s st.
 
 (* does a proc respect variable usage? *)
 Inductive ProcRespectful (pt : Set) (rt : Set) : Proc pt rt -> Prop :=

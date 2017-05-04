@@ -103,7 +103,6 @@ Definition lift2 {A1 A2 B} (P: A1 -> A2 -> B) (f1: env -> A1) (f2: env -> A2):
 
 (*Definition local: (world -> Prop) -> world -> pred world :=  lift1 prop.*)
 
-
 Local Open Scope logic.
 Inductive hoare_stmt :
   (value -> assertion) -> (* retC *)
@@ -128,7 +127,7 @@ Inductive hoare_stmt :
 | ht_if : forall retC ret,
           forall PC QC P Q e_b s1 s2,
           hoare_stmt retC ret
-                     PC (fun s => P s && !!((eq (v_bool true) (eval_expr e_b s)))) s1 QC Q ->
+                     PC (fun rho => P rho && !!((eq (v_bool true) (eval_expr e_b rho)))) s1 QC Q ->
           hoare_stmt retC ret
                      PC (fun rho => P rho && !!((eq (v_bool true) (eval_expr e_b rho)))) s2 QC Q ->
           hoare_stmt retC ret
@@ -138,9 +137,9 @@ Inductive hoare_stmt :
                    forall PC PC' QC P P' Q Q' s,
                    hoare_stmt retC ret
                               PC P s QC Q ->
-                   PC' |-- PC ->
-                   P' |-- P ->
-                   Q |-- Q' ->
+                   (forall rho, PC' rho |-- PC rho) ->
+                   (forall rho, P' rho |-- P rho) ->
+                   (forall rho, Q rho |-- Q' rho) ->
                    hoare_stmt retC ret
                               PC' P' s QC Q'
 
@@ -149,7 +148,7 @@ Inductive hoare_stmt :
              hoare_stmt retC ret
                         PC P s QC Q ->
              hoare_stmt retC ret
-                        PC (fun rho => (P rho) * (R rho))%pred s QC (fun rho => (Q rho) * (R rho))%pred.
+                        PC (fun rho => (P rho) * (R rho))%pred s QC (fun rho => (Q rho) * (R rho))%pred
 (* XXX why pred instead of logic  * *)
 
 | ht_return : forall (retC : value -> assertion) (ret : value -> assertion),
@@ -162,14 +161,20 @@ Inductive hoare_stmt :
 | ht_while : forall retC ret,
              forall C P e_b s,
              hoare_stmt retC ret
-                        C (fun s => P s && !!(eq (v_bool true) (eval_expr e_b s))) s C P ->
+                        C (fun rho => P rho && !!(eq (v_bool true) (eval_expr e_b rho))) s C P ->
              hoare_stmt retC ret
-                        C P (s_while e_b s) C (fun rho => P rho && !!(eq (v_bool false) (eval_expr e_b rho))).
+                        C P (s_while e_b s) C (fun rho => P rho && !!(eq (v_bool false) (eval_expr e_b rho)))
 
 | ht_assign : forall retC ret,
               forall C P v e,
               hoare_stmt retC ret
-                         C P (s_assign v e) C (fun rho => P rho).
+                         C P (s_assign v e)
+                           (fun (rho:env) => EX old:value,
+                  (* QC *)   (!!(table_get rho v = Some (eval_expr e (table_set v old rho)))
+                              && C (table_set v old rho)))
+                           (fun (rho:env) => EX old:value,
+                   (* Q *)   (!!(table_get rho v = Some (eval_expr e (table_set v old rho)))
+                              && P (table_set v old rho)))
 
 with hoare_proc :
   (value -> assertion) -> (value -> assertion) -> proc -> 

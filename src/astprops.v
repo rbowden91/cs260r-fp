@@ -215,7 +215,7 @@ Inductive StmtLooseVars: forall t, Stmt -> list (Var t) -> Prop :=
 
 (* check that procedure returns are ok *)
 
-Inductive StmtEndsInReturn: Stmt -> Type -> Prop :=
+Inductive StmtEndsInReturn: Stmt -> Set -> Prop :=
 | block_ends_in_return: forall ss t e,
      StmtEndsInReturn (block (ss ++ [return_ t e])) t
 | if_ends_in_return: forall s1 s2 t e,
@@ -224,7 +224,7 @@ Inductive StmtEndsInReturn: Stmt -> Type -> Prop :=
 | return_ends_in_return: forall t e,
      StmtEndsInReturn (return_ t e) t
 with
-(*Inductive*) ProcReturnOk: forall (pt : Set) rt, Proc pt rt -> Prop :=
+(*Inductive*) ProcReturnOk: forall (pt: Set) (rt: Set), Proc pt rt -> Prop :=
 | proc_return_ok: forall pt rt v s,
      StmtEndsInReturn s rt ->
      ProcReturnOk pt rt (proc pt rt v s)

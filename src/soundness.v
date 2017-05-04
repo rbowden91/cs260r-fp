@@ -16,6 +16,7 @@ Module StringMap := FMapList.Make String_as_OT.
 Module StringMapFacts := FMapFacts.WFacts_fun String_as_OT StringMap.
 
 Require Import ast.
+Require Import astprops.
 Require Import semantics.
 
 Definition localenv_sound (env: Locals) (prog : Stmt): Prop :=

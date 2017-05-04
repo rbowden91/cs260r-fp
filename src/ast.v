@@ -31,9 +31,9 @@ Inductive Lock: Set -> Type :=
 | lock : forall t, Invariant t -> Lock t
 .
 
-(* variables are named with strings *)
+(* variables are named with strings^W nats *)
 Inductive Var: Set -> Type :=
-| var: forall t, string -> Var t
+| var: forall t, nat (*string*) -> Var t
 .
 
 (*

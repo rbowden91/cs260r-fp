@@ -151,7 +151,7 @@ Inductive InStmt : forall t, Var t -> Stmt -> Prop :=
 (* Inductive InProc := . *)
 
 (* does this expression respect the usage of varname s to denote a type t? *)
-Inductive ExprVarRespectsT (t : Set) (s : string) : forall t', Expr t' -> Prop :=
+Inductive ExprVarRespectsT (t : Set) (s : (*string*)nat) : forall t', Expr t' -> Prop :=
 | evrt_value : forall t' exp,
     ExprVarRespectsT t s t' (value t' exp)
 | evrt_read_eq : (* expr type had better be the same *)
@@ -165,7 +165,7 @@ Inductive ExprVarRespectsT (t : Set) (s : string) : forall t', Expr t' -> Prop :
 
 (* does this statement respect the usage of varname s to denote a type t? *)
 (* XXX note that in both of these, non-usage counts as respectful! *)
-Inductive StmtVarRespectsT (t : Set) (s : string) : Stmt -> Prop :=
+Inductive StmtVarRespectsT (t : Set) (s : (*string*)nat) : Stmt -> Prop :=
 | svrt_block_nil : StmtVarRespectsT t s (block [])
 | svrt_block_cons : forall st sts,
     StmtVarRespectsT t s st -> StmtVarRespectsT t s (block sts) ->

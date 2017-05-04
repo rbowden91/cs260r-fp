@@ -3,7 +3,7 @@ Require Import Omega.
 Require Import String.
 Require Import List.
 Import ListNotations.
-Add LoadPath "/Users/rbowden/Dropbox (CS50)/courses/cs260r/cs260r-fp/VST".
+
 Require Import msl.eq_dec.
 Import Relations.
 

@@ -154,6 +154,7 @@ with
      VarsUniqueProc pt rt (proc pt rt x body)
 .
 
+(*
 (* check that variable declarations are unique *)
 Inductive StmtDeclaresVar: forall t, Stmt -> Var t -> bool -> Prop :=
 | block_declares_var_nil: forall t v,
@@ -208,7 +209,7 @@ Inductive StmtLooseVars: forall t, Stmt -> list (Var t) -> Prop :=
      StmtLooseVars t (block []) []
 | (* TBD *)
 *)
-
+*)
 
 (* check that procedure returns are ok *)
 
@@ -345,12 +346,12 @@ Inductive ProcVarRespectsT pt rt: Proc pt rt -> Prop :=
 
 
 Definition StmtOk s : Prop :=
-   (forall t v (b : bool), StmtDeclaresVar t s v b) /\
-   (* (forall t, StmtLooseVars t s []) *) True.
+   (forall env env', VarsScopedStmt env s env') /\
+   (forall env', VarsUniqueStmt s env')
+.
 
-Inductive ProcOk: forall pt rt, Proc pt rt -> Prop :=
-| proc_ok: forall pt rt v s,
-     StmtOk s ->
-     ProcReturnOk pt rt (proc pt rt v s) ->
-     ProcOk pt rt (proc pt rt v s)
+Definition ProcOk pt rt (p: Proc pt rt): Prop :=
+   (VarsScopedProc pt rt p) /\
+   (VarsUniqueProc pt rt p) /\
+   ProcReturnOk pt rt p
 .

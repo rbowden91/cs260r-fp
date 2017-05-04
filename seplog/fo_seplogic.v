@@ -1,4 +1,4 @@
-Add LoadPath "/Users/rbowden/Dropbox (CS50)/courses/cs260r/cs260r-fp/VST".
+
 Require Import msl.msl_direct.
 Require Import msl.Coqlib2.
 (*Require Import msl.rmaps.*)

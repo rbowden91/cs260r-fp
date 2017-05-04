@@ -180,7 +180,7 @@ Section vfsobjects.
 
 Definition Pair (t1 t2: Set): Set := (t1 * t2)%type.
 
-Class vnodeclass (vnode : Set) := {
+Class vnodeclass (vnode : Type) := {
   inum_of_vnode: vnode -> nat;
   isdir: vnode -> bool;
   isfile: vnode -> bool;
@@ -192,7 +192,7 @@ Class vnodeclass (vnode : Set) := {
   foo_spec: ProcHoare unit unit (fun _ => True) foo (fun _ _ => True);
 *)
 
-  VOP_LOOKUP: Proc (Pair vnode string) (option vnode);
+  VOP_LOOKUP: Proc (vnode * string)%type (option vnode);
   lookup_spec: forall t,
      ProcHoare
         (vnode * string) (option vnode)
@@ -295,17 +295,17 @@ Inductive trace_table: Type :=
 | TraceTable: NatMap.t dir_trace -> NatMap.t file_trace -> trace_table
 .
 
-Definition tracetable_dirprop {vnt : Set} {q: vnodeclass vnt}
+Definition tracetable_dirprop {vnt : Type} {q: vnodeclass vnt}
                               (vn: vnt) (dtbl: NatMap.t dir_trace) (p : dir_trace -> Prop) :=
    forall t,
    isdir vn = true -> NatMap.find (inum_of_vnode vn) dtbl = Some t -> p t.
 
-Definition tracetable_fileprop {vnt : Set} {q: vnodeclass vnt}
+Definition tracetable_fileprop {vnt : Type} {q: vnodeclass vnt}
                                (vn : vnt) (ftbl: NatMap.t file_trace) (p: file_trace -> Prop) :=
    forall t,
    isfile vn = true -> NatMap.find (inum_of_vnode vn) ftbl = Some t -> p t.
 
-Definition tracetable_has {vnt : Set} {q : vnodeclass vnt}
+Definition tracetable_has {vnt : Type} {q : vnodeclass vnt}
                           (vn: vnt) ttbl: Prop :=
    match ttbl with
    | TraceTable dtbl ftbl =>
@@ -313,7 +313,7 @@ Definition tracetable_has {vnt : Set} {q : vnodeclass vnt}
         (tracetable_fileprop vn ftbl (fun t => filetrace_of_vnode vn = t))
    end.
 
-Definition tracetable_apply {vnt: Set} {q: vnodeclass vnt}
+Definition tracetable_apply {vnt: Type} {q: vnodeclass vnt}
                             (vn: vnt) df ff ttbl: Prop :=
    match ttbl with
    | TraceTable dtbl ftbl =>
@@ -324,8 +324,8 @@ Definition tracetable_apply {vnt: Set} {q: vnodeclass vnt}
 End tracetable.
 
 
-Class fsclass (vfs : Set) := {
-  vnode: Set;
+Class fsclass (vfs : Type) := {
+  vnode: Type;
   vnode_is_vnodeclass: vnodeclass vnode;
 
   root_inum: nat;

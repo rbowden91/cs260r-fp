@@ -38,11 +38,11 @@ Require Import varmap.
  *)
 
 (* scoping *)
-
-Inductive VarsScopedExpr: forall t, VarMap unit -> Expr t -> Prop :=
-| vars_scoped_value: forall env t k,
+Check read.
+Inductive VarsScopedExpr: forall (t: Type), VarMap unit -> Expr t -> Prop :=
+| vars_scoped_value: forall (t: Type) env k,
      VarsScopedExpr t env (value t k)
-| vars_scoped_read: forall t env x,
+| vars_scoped_read: forall (t: Type) env x,
      VarMapIn x env ->
      VarsScopedExpr t env (read t x)
 | vars_scoped_cond: forall t env pred te fe,
@@ -215,7 +215,7 @@ Inductive StmtLooseVars: forall t, Stmt -> list (Var t) -> Prop :=
 
 (* check that procedure returns are ok *)
 
-Inductive StmtEndsInReturn: Stmt -> Set -> Prop :=
+Inductive StmtEndsInReturn: Stmt -> Type -> Prop :=
 | block_ends_in_return: forall ss t e,
      StmtEndsInReturn (block (ss ++ [return_ t e])) t
 | if_ends_in_return: forall s1 s2 t e,
@@ -224,7 +224,7 @@ Inductive StmtEndsInReturn: Stmt -> Set -> Prop :=
 | return_ends_in_return: forall t e,
      StmtEndsInReturn (return_ t e) t
 with
-(*Inductive*) ProcReturnOk: forall (pt: Set) (rt: Set), Proc pt rt -> Prop :=
+(*Inductive*) ProcReturnOk: forall pt rt, Proc pt rt -> Prop :=
 | proc_return_ok: forall pt rt v s,
      StmtEndsInReturn s rt ->
      ProcReturnOk pt rt (proc pt rt v s)
@@ -285,7 +285,7 @@ Inductive InStmt : forall t, Var t -> Stmt -> Prop :=
 (* Inductive InProc := . *)
 
 (* does this expression respect the usage of varname s to denote a type t? *)
-Inductive ExprVarRespectsT (t : Set) (s : string) : forall t', Expr t' -> Prop :=
+Inductive ExprVarRespectsT (t : Type) (s : string) : forall t', Expr t' -> Prop :=
 | evrt_value : forall t' exp,
     ExprVarRespectsT t s t' (value t' exp)
 | evrt_read_eq : (* expr type had better be the same *)
@@ -299,7 +299,7 @@ Inductive ExprVarRespectsT (t : Set) (s : string) : forall t', Expr t' -> Prop :
 
 (* does this statement respect the usage of varname s to denote a type t? *)
 (* XXX note that in both of these, non-usage counts as respectful! *)
-Inductive StmtVarRespectsT (t : Set) (s : string) : Stmt -> Prop :=
+Inductive StmtVarRespectsT (t : Type) (s : string) : Stmt -> Prop :=
 | svrt_block_nil : StmtVarRespectsT t s (block [])
 | svrt_block_cons : forall st sts,
     StmtVarRespectsT t s st -> StmtVarRespectsT t s (block sts) ->
@@ -339,7 +339,7 @@ Inductive StmtVarRespectsT (t : Set) (s : string) : Stmt -> Prop :=
 (* Print StmtVarRespectsT. *)
 
 (* does a proc respect variable usage? *)
-Inductive ProcVarRespectsT (pt : Set) (rt : Set) : Proc pt rt -> Prop :=
+Inductive ProcVarRespectsT pt rt: Proc pt rt -> Prop :=
 | pvrt : forall s st,
     StmtVarRespectsT pt s st ->
     (forall t s, InStmt t (var t s) st -> StmtVarRespectsT t s st) ->

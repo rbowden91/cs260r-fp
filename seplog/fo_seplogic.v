@@ -1,10 +1,8 @@
-
 Require Import msl.msl_direct.
-Require Import msl.Coqlib2.
-(*Require Import msl.rmaps.*)
-(*Require Import msl.rmaps_lemmas.*)
-Require Import veric.lift.
 Require Import msl.seplog.
+Require Import msl.alg_seplog_direct.
+Require Import msl.Coqlib2.
+Require Import veric.lift.
 Require Import msl.log_normalize.
 Require Import ast.
 Require Import List.
@@ -22,12 +20,11 @@ Instance Sep_world : Sep_alg world := _.
 Instance Canc_world : Canc_alg world := _.
 Proof.
 Admitted.
+
 Instance Disj_world : Disj_alg world := _.
 Proof.
 Admitted.
 Instance Nm: NatDed (pred world) := _.
-Proof.
-Admitted.
 
 Definition assertion := env -> pred world.
 
@@ -148,8 +145,7 @@ Inductive hoare_stmt :
              hoare_stmt retC ret
                         PC P s QC Q ->
              hoare_stmt retC ret
-                        PC (fun rho => (P rho) * (R rho))%pred s QC (fun rho => (Q rho) * (R rho))%pred
-(* XXX why pred instead of logic  * *)
+                        PC (fun rho => (P rho) * (R rho)) s QC (fun rho => (Q rho) * (R rho))
 
 | ht_return : forall (retC : value -> assertion) (ret : value -> assertion),
               forall e PC P,

@@ -82,6 +82,7 @@ Inductive cmd : Type -> Type :=
 | Fail {result} : cmd result
 | Bind {result result'} (c1 : cmd result') (c2 : result' -> cmd result) : cmd result
 | Loop {acc : Set} (init : acc) (body : acc -> cmd (loop_outcome acc)) : cmd acc
+| If {result} (
 
 | Read (a : nat) : cmd heapval
 | Write (a : nat) (v : heapval) : cmd unit
@@ -93,6 +94,8 @@ Inductive cmd : Type -> Type :=
 
 | Lock (a : nat) : cmd unit
 | Unlock (a : nat) : cmd unit
+| MakeLock (a : nat) (r : invariant)
+| FreeLock (a : nat)
 | Alloc (numWords : nat) : cmd nat
 | Free (base numWords : nat) : cmd unit
 
@@ -127,7 +130,7 @@ Inductive step : forall A, disk * heap * cmd A -> disk * heap * cmd A -> Prop :=
   -> step (d, h, Bind c1 c2) (d', h', Bind c1' c2)
 | StepBindProceed : forall (result result' : Set) (v : result') (c2 : result' -> cmd result) d h,
   step (d, h, Bind (Return v) c2) (d, h, c2 v)
-(* XXX ROB why doesn't this update state? *)
+
 | StepLoop : forall (acc : Set) (init : acc) (body : acc -> cmd (loop_outcome acc)) h d,
   step (d, h, Loop init body) (d, h, o <- body init; match o with
                                                      | Done a => Return a
@@ -166,6 +169,11 @@ Inductive step : forall A, disk * heap * cmd A -> disk * heap * cmd A -> Prop :=
   step (d, h, Lock a) (d, h, Return tt)
 | StepUnlock : forall h a d,
   step (d, h, Unlock a) (d, h, Return tt)
+
+| StepMakeLock : forall h a d,
+  step (d, h, Lock a) (d, h, Return tt)
+| StepFreeLock : forall h a d,
+  step (d, h, Lock a) (d, h, Return tt)
 
 | StepPar1 : forall d h c1 c2 d' h' c1',
   step (d, h, c1) (d', h', c1')

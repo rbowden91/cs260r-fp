@@ -1,5 +1,6 @@
 Require Import csrc.bar.
 
+Require Import compcert.exportclight.Clightdefs.
 Require Import compcert.cfrontend.Cshmgen.
 Require Import compcert.exportclight.Clightdefs.
 Require Import compcert.cfrontend.Cminorgen.
@@ -80,7 +81,12 @@ Definition cm_prog' :=
   Cminorgen.transl_program csh_p.
 
 Definition cm_prog := Eval vm_compute in cm_prog'.
-
+Print _foo.
+Print _x.
+Print _y.
+Print _z.
+Print cm_prog.
+Print _bar.
 Lemma compiles_ok : exists prog, cm_prog = OK prog.
   unfold cm_prog; eauto.
 Qed.

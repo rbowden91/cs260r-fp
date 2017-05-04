@@ -352,9 +352,15 @@ Definition resource_invariant_map := MemorySegment.t resource_invariant.
 Definition return_condition := (list val -> mprop).
 Definition block_conditions := list mprop.
 
+(* XXX copied from CminorExample *)
+Fixpoint is_pure_expr (e : Cminor.expr) : bool :=
+  match e with
+  | Cminor.Eunop _ e1 => is_pure_expr e1
+  | Cminor.Ebinop _ e1 e2 => andb (is_pure_expr e1) (is_pure_expr e2)
+  | Cminor.Eload _ _ => false
+  | _ => true
+  end.
 
-
-Definition translate_pure (e : expr) (env : LocalEnv.am
 
 (* C should always hold *)
 Inductive hoare_judgement :
@@ -378,16 +384,19 @@ Inductive hoare_judgement :
 | HtBlock : forall J R B S E P C Q s,
     hoare_judgement J R (Q::B) S E P C s MFalse ->
     hoare_judgement J R B S E P C (Sblock s) Q
-| HtIfThenElseImpure : forall ,
-    impure(e) ->
-    hoare_judgement J R B S E P C (Sassign  ;; Sifthenelse e s1 s2) Q ->
-    hoare_judgement J R B S E P C (Sifthenelse e s1 s2) Q -> (* Lift? *)
+
+
+| HtAssign : forall J R B P C,
+  is_pure_expr e1 = true ->
+  is_pure_expr e2 = true ->
+  
+  hoare_judgement J R B S E P C (Sassign e1 e2) 
 
 | HtIfThenElse : forall J R B S E P C Q e s1 s2,
-    pure(e) -> (* Why pure? *)
+    is_pure_expr e = true -> (* Why pure? *)
     hoare_judgement J R B S E (P * lift(e)) C s1 Q -> (* Lift? *)
-    hoare_judgement J R B S E (P * not(lift(e))) C s2 Q -> (* Lift? *)
-    hoare_judgement J R B S E P C (Sifthenelse e s1 s2) Q -> (* Lift? *)
+    hoare_judgement J R B S E (P * lift(e))) C s2 Q -> (* Lift? *)
+    hoare_judgement J R B S E P C (Sifthenelse e s1 s2) Q ->
 
 
 | HtReturn : forall J R B S E P C el vl,
@@ -396,9 +405,7 @@ Inductive hoare_judgement :
     hoare_judgement J R B S E P C (Sreturn el) MFalse.
 
 
-| HtAssign : forall J R B P C,
-  ->
-  hoare_judgement J R B S E P C (Sassign a e) 
+
 | HtStore :
 | HtCall :
 

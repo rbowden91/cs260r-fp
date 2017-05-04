@@ -13,6 +13,8 @@ Module NatMapFacts := FMapFacts.WFacts_fun Nat_as_OT NatMap.
 Require Import stringfacts.
 Require Import base.
 Require Import ast.
+Require Import astprops.
+Require Import semantics.
 Require Import logic.
 Require Import vfs.
 Require Import semantics.

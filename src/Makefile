@@ -1,7 +1,7 @@
 COQC=coqc
 COQDEP=coqdep
 
-SRCS=stringfacts.v string_as_ot.v base.v ast.v logic.v vfs.v semantics.v all.v
+SRCS=stringfacts.v string_as_ot.v base.v ast.v astprops.v semantics.v logic.v vfs.v all.v
 
 .SUFFIXES: .v .vo
 

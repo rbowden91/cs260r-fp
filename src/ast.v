@@ -66,7 +66,7 @@ with
 (*
  * procs both take and produce values
  *)
-(*Inductive*) Proc: Type -> Type -> Type :=
+(*Inductive*) Proc: Set -> Set -> Type :=
 | proc: forall pt rt, Var pt -> Stmt -> Proc pt rt
 .
 

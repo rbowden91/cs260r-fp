@@ -68,7 +68,7 @@ with
  * procs both take and produce values
  *)
 (*Inductive*) Proc: Type -> Type -> Type :=
-| proc: forall pt rt, var pt -> stmt -> Proc pt rt
+| mkproc: forall pt rt, var pt -> stmt -> Proc pt rt
 .
 
 

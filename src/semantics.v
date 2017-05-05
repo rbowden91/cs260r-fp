@@ -37,7 +37,7 @@ Require Import ast.
  *)
 
 (* XXX placeholders *)
-Hypotheses addr_from_lock: forall t, Lock t -> nat.
+Hypotheses addr_from_lock: forall t, lock t -> nat.
 
 (**************************************************************)	
 (* stores *)
@@ -58,7 +58,7 @@ Section Expressions.
 
 Inductive ExprYields: forall t, Locals -> Expr t -> t -> Prop :=
 | value_yields: forall loc t a, ExprYields t loc (value t a) a
-| read_yields: forall loc t (x : Var t) id a,
+| read_yields: forall loc t (x : var t) id a,
     x = mkvar t id -> NatMap.find id loc = Some (mkval t a) ->
     ExprYields t loc (read t x) a
 | cond_true_yields: forall t loc e et ef a,
@@ -133,7 +133,7 @@ Section Stacks.
 
 Inductive Stack: Type :=
 | stack_empty: Stack
-| stack_pending: forall t, Locals -> Var t -> Stack -> Stack
+| stack_pending: forall t, Locals -> var t -> Stack -> Stack
 .
 
 End Stacks.

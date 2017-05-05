@@ -178,7 +178,7 @@ with
 
 
 (* variable gets read by an expression *)
-Inductive InExpr : forall t, Var t -> Expr t -> Prop :=
+Inductive InExpr : forall t, var t -> Expr t -> Prop :=
 | inexpr_read : forall t v,
     InExpr t v (read t v)
 | inexpr_cond : forall t v b e1 e2,
@@ -186,7 +186,7 @@ Inductive InExpr : forall t, Var t -> Expr t -> Prop :=
 .
 
 (* variable gets used in a statement *)
-Inductive InStmt : forall t, Var t -> Stmt -> Prop :=
+Inductive InStmt : forall t, var t -> Stmt -> Prop :=
 | instmt_block_front : forall t v st sts,
     InStmt t v st -> InStmt t v (block (st :: sts))
 | instmt_block_cons : forall t v st sts,

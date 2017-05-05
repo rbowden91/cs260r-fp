@@ -27,13 +27,13 @@ Inductive Invariant : Set -> Type :=
 .
 
 (* locks are a special class of variables *)
-Inductive Lock: Type -> Type :=
-| mklock : forall t, Invariant t -> Lock t
+Inductive lock: Type -> Type :=
+| mklock : forall t, Invariant t -> lock t
 .
 
 (* variables are identified with numbers *)
-Inductive Var: Type -> Type :=
-| mkvar: forall t, nat -> Var t
+Inductive var: Type -> Type :=
+| mkvar: forall t, nat -> var t
 .
 
 (*
@@ -41,7 +41,7 @@ Inductive Var: Type -> Type :=
  *)
 Inductive Expr: Type -> Type :=
 | value: forall (t : Type), t -> Expr t
-| read: forall (t: Type), Var t -> Expr t
+| read: forall (t: Type), var t -> Expr t
 | cond: forall t, Expr bool -> Expr t -> Expr t -> Expr t
 .
 
@@ -51,24 +51,24 @@ Inductive Expr: Type -> Type :=
 Inductive Stmt: Type :=
 | block: list Stmt -> Stmt
 | start: forall (pt : Type), Proc pt unit -> Expr pt -> Stmt
-| assign: forall t, Var t -> Expr t -> Stmt
-| load: forall t, Var t -> Lock t -> Stmt
-| store: forall t, Lock t -> Expr t -> Stmt
+| assign: forall t, var t -> Expr t -> Stmt
+| load: forall t, var t -> lock t -> Stmt
+| store: forall t, lock t -> Expr t -> Stmt
 | scope: Stmt -> Stmt
 | if_: Expr bool -> Stmt -> Stmt -> Stmt
 | while: Expr bool -> Stmt -> Stmt
-| call: forall (pt : Type) rt, Var rt -> Proc pt rt -> Expr pt -> Stmt
-| local: forall t, Var t -> Expr t -> Stmt
+| call: forall (pt : Type) rt, var rt -> Proc pt rt -> Expr pt -> Stmt
+| local: forall t, var t -> Expr t -> Stmt
 | return_: forall t, Expr t -> Stmt
-| getlock: forall t, Lock t -> Stmt
-| putlock: forall t, Lock t -> Stmt
+| getlock: forall t, lock t -> Stmt
+| putlock: forall t, lock t -> Stmt
 with
 
 (*
  * procs both take and produce values
  *)
 (*Inductive*) Proc: Type -> Type -> Type :=
-| proc: forall pt rt, Var pt -> Stmt -> Proc pt rt
+| proc: forall pt rt, var pt -> Stmt -> Proc pt rt
 .
 
 

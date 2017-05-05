@@ -27,7 +27,7 @@ Require Import ast.
  * around with it.
  *)
 
-Definition var_id {t} (x: Var t) :=
+Definition var_id {t} (x: var t) :=
    match x with
    | mkvar _ id => id
    end.
@@ -52,12 +52,12 @@ Admitted.
 
 Definition VarMap := StringMap.t.
 Definition VarMap_empty := StringMap.empty.
-Definition VarMap_add {t} {t2} (k: Var t) (v: t2) m := StringMap.add (var_id k) v m.
+Definition VarMap_add {t} {t2} (k: var t) (v: t2) m := StringMap.add (var_id k) v m.
 Definition VarMap_union {t} m1 m2 := @StringMap_union t m1 m2.
 Definition VarMapDisjoint := StringMapProperties.Disjoint.
-Definition VarMapIn {t} {t2} (k: Var t) (m: StringMap.t t2) :=
+Definition VarMapIn {t} {t2} (k: var t) (m: StringMap.t t2) :=
    StringMap.In (var_id k) m.
-Definition VarMapMapsTo {t} {t2} (k: Var t) (v: t2) (m: StringMap.t t2) :=
+Definition VarMapMapsTo {t} {t2} (k: var t) (v: t2) (m: StringMap.t t2) :=
    StringMap.MapsTo (var_id k) v m.
 *)
 
@@ -78,11 +78,11 @@ Admitted.
 
 Definition VarMap := NatMap.t.
 Definition VarMap_empty := NatMap.empty.
-Definition VarMap_add {t} {t2} (k: Var t) (v: t2) m :=
+Definition VarMap_add {t} {t2} (k: var t) (v: t2) m :=
    NatMap.add (var_id k) v m.
 Definition VarMap_union {t} m1 m2 := @NatMap_union t m1 m2.
 Definition VarMapDisjoint := NatMapProperties.Disjoint.
-Definition VarMapIn {t} {t2} (k: Var t) (m: NatMap.t t2) :=
+Definition VarMapIn {t} {t2} (k: var t) (m: NatMap.t t2) :=
    NatMap.In (var_id k) m.
-Definition VarMapMapsTo {t} {t2} (k: Var t) (v: t2) (m: NatMap.t t2) :=
+Definition VarMapMapsTo {t} {t2} (k: var t) (v: t2) (m: NatMap.t t2) :=
    NatMap.MapsTo (var_id k) v m.

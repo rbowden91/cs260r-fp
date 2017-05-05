@@ -5,7 +5,6 @@ Require Import List.
 Import ListNotations.
 
 Require Import msl.eq_dec.
-Import Relations.
 
 (* ************************************************************ *)
 (* ************************************************************ *)
@@ -39,15 +38,6 @@ Inductive value : Type :=
 
 
 
-
-Instance EqDec_var : EqDec (var) := _.
-Proof.
-Admitted.
-
-
-Instance EqDec_lock : EqDec (lock) := _.
-Proof.
-Admitted.
 
 Inductive invariant : Type :=
 (* Just an example *)
@@ -94,4 +84,14 @@ with
 Notation "[{ s1 ; s2 ; }]" :=
   (s_seq s1 s2) (at level 90, s1 at next level, s2 at next level, format
 "'[v' [{ '[  ' '//' s1 ; '//' s2 ; ']' '//' }] ']'").
+
+
+Instance EqDec_var : EqDec (var) := _.
+Proof.
+Admitted.
+
+
+Instance EqDec_lock : EqDec (lock) := _.
+Proof.
+Admitted.
 

@@ -13,6 +13,10 @@ Require Import ast.
 Require Import List.
 Import ListNotations.
 
+Require Import table.
+
+
+
 Definition world := (lock -> option value)%type.
 
 Instance Join_world: Join world :=

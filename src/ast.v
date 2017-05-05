@@ -50,14 +50,14 @@ Inductive expr: Type -> Type :=
  *)
 Inductive stmt: Type :=
 | block: list stmt -> stmt
-| start: forall (pt : Type), Proc pt unit -> expr pt -> stmt
+| start: forall (pt : Type), proc pt unit -> expr pt -> stmt
 | assign: forall t, var t -> expr t -> stmt
 | load: forall t, var t -> lock t -> stmt
 | store: forall t, lock t -> expr t -> stmt
 | scope: stmt -> stmt
 | if_: expr bool -> stmt -> stmt -> stmt
 | while: expr bool -> stmt -> stmt
-| call: forall (pt : Type) rt, var rt -> Proc pt rt -> expr pt -> stmt
+| call: forall (pt : Type) rt, var rt -> proc pt rt -> expr pt -> stmt
 | local: forall t, var t -> expr t -> stmt
 | return_: forall t, expr t -> stmt
 | getlock: forall t, lock t -> stmt
@@ -67,8 +67,8 @@ with
 (*
  * procs both take and produce values
  *)
-(*Inductive*) Proc: Type -> Type -> Type :=
-| mkproc: forall pt rt, var pt -> stmt -> Proc pt rt
+(*Inductive*) proc: Type -> Type -> Type :=
+| mkproc: forall pt rt, var pt -> stmt -> proc pt rt
 .
 
 

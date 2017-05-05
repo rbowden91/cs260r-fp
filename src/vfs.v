@@ -192,7 +192,7 @@ Class vnodeclass (vnode : Type) := {
   foo_spec: ProcHoare unit unit (fun _ => True) foo (fun _ _ => True);
 *)
 
-  VOP_LOOKUP: Proc (vnode * string)%type (option vnode);
+  VOP_LOOKUP: proc (vnode * string)%type (option vnode);
   lookup_spec: forall t,
      ProcHoare
         (vnode * string) (option vnode)
@@ -209,7 +209,7 @@ Class vnodeclass (vnode : Type) := {
             ));
 
 
-  VOP_CREATE: Proc (vnode * string) (option vnode);
+  VOP_CREATE: proc (vnode * string) (option vnode);
   create_spec: forall t ino,
      ProcHoare
         (vnode * string) (option vnode)
@@ -229,7 +229,7 @@ Class vnodeclass (vnode : Type) := {
                end
          );
 
-  VOP_UNLINK: Proc (vnode * string) (option unit);
+  VOP_UNLINK: proc (vnode * string) (option unit);
   unlink_spec: forall t,
      ProcHoare
         (vnode * string) (option unit)
@@ -244,7 +244,7 @@ Class vnodeclass (vnode : Type) := {
            end
         );
 
-  VOP_READ: Proc (vnode * nat * nat) bytes;
+  VOP_READ: proc (vnode * nat * nat) bytes;
   read_spec: forall t,
      ProcHoare
         (vnode * nat * nat) bytes
@@ -255,7 +255,7 @@ Class vnodeclass (vnode : Type) := {
         (fun arg ret => let (arg', offset) := arg in let (file, len) := arg' in
            filetrace_of_vnode file = t /\ ret = filetrace_read t len offset);
 
-  VOP_WRITE: Proc (vnode * bytes * nat) unit;
+  VOP_WRITE: proc (vnode * bytes * nat) unit;
   write_spec: forall t,
      ProcHoare
         (vnode * bytes * nat) unit
@@ -266,7 +266,7 @@ Class vnodeclass (vnode : Type) := {
         (fun arg ret => let (arg', offset) := arg in let (file, data) := arg' in
            filetrace_of_vnode file = filetrace_append t (FileWrite data offset));
 
-  VOP_TRUNCATE: Proc (vnode * nat) unit;
+  VOP_TRUNCATE: proc (vnode * nat) unit;
   truncate_spec: forall t,
      ProcHoare
         (vnode * nat) unit
@@ -277,7 +277,7 @@ Class vnodeclass (vnode : Type) := {
         (fun arg ret => let (file, size) := arg in
            filetrace_of_vnode file = filetrace_append t (FileTruncate size));
 
-  VOP_FSYNC: Proc vnode unit;
+  VOP_FSYNC: proc vnode unit;
   fsync_spec: forall t,
      ProcHoare
         vnode unit
@@ -331,7 +331,7 @@ Class fsclass (vfs : Type) := {
   root_inum: nat;
   getvnode: vfs -> nat -> vnode;
 
-  VFS_GETROOT: Proc vfs vnode;
+  VFS_GETROOT: proc vfs vnode;
   getroot_spec:
      ProcHoare
         vfs vnode
@@ -340,7 +340,7 @@ Class fsclass (vfs : Type) := {
         (fun fs rootvn => inum_of_vnode rootvn = root_inum /\
            isdir rootvn = true);
 
-  VFS_SYNC: Proc vfs unit;
+  VFS_SYNC: proc vfs unit;
   sync_spec: forall ttbl,
      ProcHoare
         vfs unit
@@ -351,7 +351,7 @@ Class fsclass (vfs : Type) := {
            getvnode fs inum = vn ->
               tracetable_apply vn dirtrace_sync filetrace_sync ttbl);
 
-  newfs: Proc unit vfs;
+  newfs: proc unit vfs;
   newfs_spec:
      ProcHoare
         unit vfs

@@ -101,7 +101,7 @@ Inductive VarsScopedStmt: VarMap Type -> stmt -> VarMap Type -> Prop :=
 | vars_scoped_putlock: forall t env l,
      VarsScopedStmt env (getlock t l) env
 with
-(*Inductive*) VarsScopedProc: forall pt rt, Proc pt rt -> Prop :=
+(*Inductive*) VarsScopedProc: forall pt rt, proc pt rt -> Prop :=
 | vars_scoped_proc: forall pt rt id body env',
      VarsScopedStmt (VarMap_add (mkvar pt id) pt (VarMap_empty Type)) body env' ->
      VarsScopedProc pt rt (mkproc pt rt (mkvar pt id) body)
@@ -151,7 +151,7 @@ Inductive VarsUniqueStmt: stmt -> VarMap unit -> Prop :=
 | vars_unique_putlock: forall t l,
      VarsUniqueStmt (getlock t l) (VarMap_empty unit)
 with
-(*Inductive*) VarsUniqueProc: forall pt rt, Proc pt rt -> Prop :=
+(*Inductive*) VarsUniqueProc: forall pt rt, proc pt rt -> Prop :=
 | vars_unique_proc: forall pt rt x body env',
      VarMapDisjoint unit (VarMap_add x tt(*unit*) (VarMap_empty unit)) env' ->
      VarsUniqueStmt body env' ->
@@ -170,7 +170,7 @@ Inductive StmtEndsInReturn: stmt -> Type -> Prop :=
 | return_ends_in_return: forall t e,
      StmtEndsInReturn (return_ t e) t
 with
-(*Inductive*) ProcReturnOk: forall pt rt, Proc pt rt -> Prop :=
+(*Inductive*) ProcReturnOk: forall pt rt, proc pt rt -> Prop :=
 | proc_return_ok: forall pt rt v s,
      StmtEndsInReturn s rt ->
      ProcReturnOk pt rt (mkproc pt rt v s)
@@ -288,7 +288,7 @@ Inductive StmtVarRespectsT (t : Type) (s : varidtype) : stmt -> Prop :=
 (* Print StmtVarRespectsT. *)
 
 (* does a proc respect variable usage? *)
-Inductive ProcVarRespectsT pt rt: Proc pt rt -> Prop :=
+Inductive ProcVarRespectsT pt rt: proc pt rt -> Prop :=
 | pvrt : forall s st,
     StmtVarRespectsT pt s st ->
     (forall t s, InStmt t (mkvar t s) st -> StmtVarRespectsT t s st) ->
@@ -301,7 +301,7 @@ Definition StmtOk s : Prop :=
    (forall env', VarsUniqueStmt s env')
 .
 
-Definition ProcOk pt rt (p: Proc pt rt): Prop :=
+Definition ProcOk pt rt (p: proc pt rt): Prop :=
    (VarsScopedProc pt rt p) /\
    (VarsUniqueProc pt rt p) /\
    ProcReturnOk pt rt p

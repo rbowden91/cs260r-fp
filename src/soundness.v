@@ -446,9 +446,9 @@ Lemma StmtStepsProgress_new:
     VarsScopedStmt tyenv s tyenv2 ->
     localenv_sound_new tyenv l ->
     s <> skip ->
-    (forall t p arg, s = start t p arg -> False) ->
-    (forall pt rt x p e, s = call pt rt x p e -> False) ->
-    (forall rt e, s = return_ rt e -> False) ->
+    (forall t p arg, s = s_start t p arg -> False) ->
+    (forall pt rt x p e, s = s_call pt rt x p e -> False) ->
+    (forall rt e, s = s_return rt e -> False) ->
     exists h' l' s',
       StmtSteps h l s h' l' s'.
 Proof.
@@ -488,7 +488,7 @@ Definition threadstmt (t: Thread) :=
 Lemma ThreadStepsProgress_new:
    forall tyenv tyenv2 h t,
       ThreadStateSound tyenv t tyenv2 ->
-      (forall ty p arg, threadstmt t = start ty p arg -> False) ->
+      (forall ty p arg, threadstmt t = s_start ty p arg -> False) ->
       exists h' t',
          ThreadSteps h t h' t'.
 Proof.
@@ -497,7 +497,7 @@ Admitted.
 Lemma ThreadStepsStartProgress_new:
    forall tyenv tyenv2 t,
       ThreadStateSound tyenv t tyenv2 ->
-      (exists ty p arg, threadstmt t = start ty p arg) ->
+      (exists ty p arg, threadstmt t = s_start ty p arg) ->
       exists t' tnew,
          ThreadStepsStart t t' tnew.
 Proof.

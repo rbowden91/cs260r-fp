@@ -40,28 +40,28 @@ Inductive var: Type -> Type :=
  * expressions produce values
  *)
 Inductive expr: Type -> Type :=
-| value: forall (t : Type), t -> expr t
-| read: forall (t: Type), var t -> expr t
-| cond: forall t, expr bool -> expr t -> expr t -> expr t
+| e_value: forall (t : Type), t -> expr t
+| e_read: forall (t: Type), var t -> expr t
+| e_cond: forall t, expr bool -> expr t -> expr t -> expr t
 .
 
 (*
  * statements don't
  *)
 Inductive stmt: Type :=
-| block: list stmt -> stmt
-| start: forall (pt : Type), proc pt unit -> expr pt -> stmt
-| assign: forall t, var t -> expr t -> stmt
-| load: forall t, var t -> lock t -> stmt
-| store: forall t, lock t -> expr t -> stmt
-| scope: stmt -> stmt
-| if_: expr bool -> stmt -> stmt -> stmt
-| while: expr bool -> stmt -> stmt
-| call: forall (pt : Type) rt, var rt -> proc pt rt -> expr pt -> stmt
-| local: forall t, var t -> expr t -> stmt
-| return_: forall t, expr t -> stmt
-| getlock: forall t, lock t -> stmt
-| putlock: forall t, lock t -> stmt
+| s_block: list stmt -> stmt
+| s_start: forall (pt : Type), proc pt unit -> expr pt -> stmt
+| s_assign: forall t, var t -> expr t -> stmt
+| s_load: forall t, var t -> lock t -> stmt
+| s_store: forall t, lock t -> expr t -> stmt
+| s_scope: stmt -> stmt
+| s_if: expr bool -> stmt -> stmt -> stmt
+| s_while: expr bool -> stmt -> stmt
+| s_call: forall (pt : Type) rt, var rt -> proc pt rt -> expr pt -> stmt
+| s_local: forall t, var t -> expr t -> stmt
+| s_return: forall t, expr t -> stmt
+| s_getlock: forall t, lock t -> stmt
+| s_putlock: forall t, lock t -> stmt
 with
 
 (*
@@ -77,8 +77,8 @@ with
  *)
 
 Definition coqcall {ta tr : Set} (f : ta -> tr) (x : ta): expr tr :=
-   value tr (f x)
+   e_value tr (f x)
 .
 
-Definition skip: stmt := block nil.
+Definition skip: stmt := s_block nil.
 

@@ -38,13 +38,12 @@ Require Import varmap.
  *)
 
 (* scoping *)
-Check read.
-Inductive VarsScopedExpr: forall (t: Type), VarMap unit -> Expr t -> Prop :=
+Inductive VarsScopedExpr: forall (t: Type), VarMap Type -> Expr t -> Prop :=
 | vars_scoped_value: forall (t: Type) env k,
      VarsScopedExpr t env (value t k)
-| vars_scoped_read: forall (t: Type) env x,
-     VarMapIn x env ->
-     VarsScopedExpr t env (read t x)
+| vars_scoped_read: forall (t: Type) env id,
+     VarMapMapsTo (var t id) t env ->
+     VarsScopedExpr t env (read t (var t id))
 | vars_scoped_cond: forall t env pred te fe,
      VarsScopedExpr bool env pred ->
      VarsScopedExpr t env te ->
@@ -52,7 +51,7 @@ Inductive VarsScopedExpr: forall (t: Type), VarMap unit -> Expr t -> Prop :=
      VarsScopedExpr t env (cond t pred te fe)
 .
 
-Inductive VarsScopedStmt: VarMap unit -> Stmt -> VarMap unit -> Prop :=
+Inductive VarsScopedStmt: VarMap Type -> Stmt -> VarMap Type -> Prop :=
 | vars_scoped_block_nil: forall env,
      VarsScopedStmt env (block []) env
 | vars_scoped_block_cons: forall env s env' ss env'',
@@ -62,16 +61,20 @@ Inductive VarsScopedStmt: VarMap unit -> Stmt -> VarMap unit -> Prop :=
 | vars_scoped_start: forall env pt p e,
      VarsScopedExpr pt env e ->
      VarsScopedStmt env (start pt p e) env
-| vars_scoped_assign: forall t env x e,
-     VarMapIn x env ->
-     VarsScopedStmt env (assign t x e) env
-| vars_scoped_load: forall t env x l,
-     VarMapIn x env ->
-     VarsScopedStmt env (load t x l) env
-| vars_scoped_store: forall t env x l e,
-     @VarMapIn t unit x env ->
+| vars_scoped_assign: forall t env id e,
+     VarsScopedExpr t env e ->
+     VarMapMapsTo (var t id) t env ->
+     VarsScopedStmt env (assign t (var t id) e) env
+| vars_scoped_load: forall t env id l,
+     VarMapMapsTo (var t id) t env ->
+     VarsScopedStmt env (load t (var t id) l) env
+| vars_scoped_store: forall t env id l e,
+     @VarMapMapsTo t Type (var t id) t env ->
      VarsScopedExpr t env e ->
      VarsScopedStmt env (store t l e) env
+| vars_scoped_scope: forall env s env',
+     VarsScopedStmt env s env' ->
+     VarsScopedStmt env (scope s) env
 | vars_scoped_if: forall env pred ts fs env't env'f,
      VarsScopedExpr bool env pred ->
      VarsScopedStmt env ts env't ->
@@ -81,15 +84,15 @@ Inductive VarsScopedStmt: VarMap unit -> Stmt -> VarMap unit -> Prop :=
      VarsScopedExpr bool env pred ->
      VarsScopedStmt env body env'body ->
      VarsScopedStmt env (while pred body) env
-| vars_scoped_call: forall env pt rt x p arg,
+| vars_scoped_call: forall env pt rt id p arg,
      VarsScopedProc pt rt p ->
      VarsScopedExpr pt env arg ->
-     VarMapIn x env ->
-     VarsScopedStmt env (call pt rt x p arg) env
-| vars_scoped_local: forall t env x e,
+     VarMapMapsTo (var rt id) rt env ->
+     VarsScopedStmt env (call pt rt (var rt id) p arg) env
+| vars_scoped_local: forall t env id e,
      VarsScopedExpr t env e ->
-     ~(VarMapIn x env) ->
-     VarsScopedStmt env (local t x e) (VarMap_add x tt(*unit*) env)
+     ~(VarMapIn (var t id) env) ->
+     VarsScopedStmt env (local t (var t id) e) (VarMap_add (var t id) t env)
 | vars_scoped_return: forall t env e,
      VarsScopedExpr t env e ->
      VarsScopedStmt env (return_ t e) env
@@ -99,9 +102,9 @@ Inductive VarsScopedStmt: VarMap unit -> Stmt -> VarMap unit -> Prop :=
      VarsScopedStmt env (getlock t l) env
 with
 (*Inductive*) VarsScopedProc: forall pt rt, Proc pt rt -> Prop :=
-| vars_scoped_proc: forall pt rt x body env',
-     VarsScopedStmt (VarMap_add x tt(*unit*) (VarMap_empty unit)) body env' ->
-     VarsScopedProc pt rt (proc pt rt x body)
+| vars_scoped_proc: forall pt rt id body env',
+     VarsScopedStmt (VarMap_add (var pt id) pt (VarMap_empty Type)) body env' ->
+     VarsScopedProc pt rt (proc pt rt (var pt id) body)
 .
 
 (* uniqueness *)
@@ -112,105 +115,48 @@ with
  * make sure they refer only to variables that exist.
  *)
 
-Inductive VarsUniqueStmt: VarMap unit -> Stmt -> VarMap unit -> Prop :=
-| vars_unique_block_nil: forall env,
-     VarsUniqueStmt env (block []) env
-| vars_unique_block_cons: forall env s env' ss env'',
-     VarsUniqueStmt env s env' ->
-     VarsUniqueStmt env' (block ss) env'' ->
-     VarsUniqueStmt env (block (s :: ss)) env''
-| vars_unique_start: forall env pt p e,
-     VarsUniqueStmt env (start pt p e) env
-| vars_unique_assign: forall t env x e,
-     VarMapIn x env ->
-     VarsUniqueStmt env (assign t x e) env
-| vars_unique_load: forall t env x l,
-     VarMapIn x env ->
-     VarsUniqueStmt env (load t x l) env
-| vars_unique_store: forall t env l e,
-     VarsUniqueStmt env (store t l e) env
-| vars_unique_if: forall env cond ts fs env't env'f,
-     VarsUniqueStmt env ts env't ->
-     VarsUniqueStmt env fs env'f ->
+Inductive VarsUniqueStmt: Stmt -> VarMap unit -> Prop :=
+| vars_unique_block_nil:
+     VarsUniqueStmt (block []) (VarMap_empty unit)
+| vars_unique_block_cons: forall s env ss env',
+     VarsUniqueStmt s env ->
+     VarsUniqueStmt (block ss) env' ->
+     VarMapDisjoint unit env env' ->
+     VarsUniqueStmt (block (s :: ss)) (VarMap_union env env')
+| vars_unique_start: forall pt p e,
+     VarsUniqueStmt (start pt p e) (VarMap_empty unit)
+| vars_unique_assign: forall t x e,
+     VarsUniqueStmt (assign t x e) (VarMap_empty unit)
+| vars_unique_load: forall t x l,
+     VarsUniqueStmt (load t x l) (VarMap_empty unit)
+| vars_unique_store: forall t l e,
+     VarsUniqueStmt (store t l e) (VarMap_empty unit)
+| vars_unique_if: forall pred ts fs env't env'f,
+     VarsUniqueStmt ts env't ->
+     VarsUniqueStmt fs env'f ->
      VarMapDisjoint unit env't env'f ->
-     VarsUniqueStmt env (if_ cond ts fs) (VarMap_union env't env'f)
-| vars_unique_while: forall env cond body env'body,
-     VarsUniqueStmt env body env'body ->
-     VarsUniqueStmt env (while cond body) env'body
-| vars_unique_call: forall env pt rt x p arg,
+     VarsUniqueStmt (if_ pred ts fs) (VarMap_union env't env'f)
+| vars_unique_while: forall cond body env'body,
+     VarsUniqueStmt body env'body ->
+     VarsUniqueStmt (while cond body) env'body
+| vars_unique_call: forall pt rt x p arg,
      VarsUniqueProc pt rt p ->
-     VarMapIn x env ->
-     VarsUniqueStmt env (call pt rt x p arg) env
-| vars_unique_local: forall env t x e,
-     ~(VarMapIn x env) ->
-     VarsUniqueStmt env (local t x e) (VarMap_add x tt(*unit*) env)
-| vars_unique_return: forall t env e,
-     VarsUniqueStmt env (return_ t e) env
-| vars_unique_getlock: forall t env l,
-     VarsUniqueStmt env (getlock t l) env
-| vars_unique_putlock: forall t env l,
-     VarsUniqueStmt env (getlock t l) env
+     VarsUniqueStmt (call pt rt x p arg) (VarMap_empty unit)
+| vars_unique_local: forall t x e,
+     VarsUniqueStmt (local t x e) (VarMap_add x tt(*unit*) (VarMap_empty unit))
+| vars_unique_return: forall t e,
+     VarsUniqueStmt (return_ t e) (VarMap_empty unit)
+| vars_unique_getlock: forall t l,
+     VarsUniqueStmt (getlock t l) (VarMap_empty unit)
+| vars_unique_putlock: forall t l,
+     VarsUniqueStmt (getlock t l) (VarMap_empty unit)
 with
 (*Inductive*) VarsUniqueProc: forall pt rt, Proc pt rt -> Prop :=
 | vars_unique_proc: forall pt rt x body env',
-     VarsUniqueStmt (VarMap_add x tt(*unit*) (VarMap_empty unit)) body env' ->
+     VarMapDisjoint unit (VarMap_add x tt(*unit*) (VarMap_empty unit)) env' ->
+     VarsUniqueStmt body env' ->
      VarsUniqueProc pt rt (proc pt rt x body)
 .
-
-(* check that variable declarations are unique *)
-Inductive StmtDeclaresVar: forall t, Stmt -> Var t -> bool -> Prop :=
-| block_declares_var_nil: forall t v,
-     StmtDeclaresVar t (block []) v false
-| block_declares_var_cons_here: forall t s ss v,
-     StmtDeclaresVar t s v true -> StmtDeclaresVar t (block ss) v false ->
-     StmtDeclaresVar t (block (s :: ss)) v true
-| block_declares_var_cons_nothere: forall t s ss v b,
-     StmtDeclaresVar t s v false -> StmtDeclaresVar t (block ss) v b ->
-     StmtDeclaresVar t (block (s :: ss)) v b
-| start_declares_var: forall t s v b pt p e,
-     StmtDeclaresVar t s v b ->
-     StmtDeclaresVar t (start pt p e) v false
-| assign_declares_var: forall t' t e e' v',
-     StmtDeclaresVar t' (assign t e e') v' false
-| load_declares_var: forall t' t v e v',
-     StmtDeclaresVar t' (load t v e) v' false
-| store_declares_var: forall t' t v e v',
-     StmtDeclaresVar t' (store t v e) v' false
-| if_declares_var: forall t e s1 s2 v b1 b2,
-     StmtDeclaresVar t s1 v b1 -> StmtDeclaresVar t s2 v b2 ->
-     StmtDeclaresVar t (if_ e s1 s2) v (b1 || b2)
-| while_declares_var: forall t e s v b,
-     StmtDeclaresVar t s v b ->
-     StmtDeclaresVar t (while e s) v b
-| call_declares_var: forall t' (pt rt : Set) v p e v' b,
-     ProcDeclaresVar t' pt rt p v' b ->
-     StmtDeclaresVar t' (call pt rt v p e) v' b
-| local_declares_var: forall t v e,
-     StmtDeclaresVar t (local t v e) v true
-| return_declares_var: forall t' t e v',
-     StmtDeclaresVar t' (return_ t e) v' false
-with
-(*Inductive*) ProcDeclaresVar: forall t pt rt, Proc pt rt -> Var t -> bool -> Prop :=
-| proc_declares_var_arg: forall pt rt s v,
-     StmtDeclaresVar pt s v false ->
-     ProcDeclaresVar pt pt rt (proc pt rt v s) v true
-| proc_declares_var_nonarg_sametype: forall pt rt s v' v b,
-     StmtDeclaresVar pt s v b ->
-     v <> v' ->
-     ProcDeclaresVar pt pt rt (proc pt rt v' s) v b
-| proc_declares_var_nonarg_othertype: forall t pt rt s v' v b,
-     StmtDeclaresVar t s v b ->
-     t <> pt ->
-     ProcDeclaresVar t pt rt (proc pt rt v' s) v b
-.
-
-(* check that variable uses are after declarations *)
-(*
-Inductive StmtLooseVars: forall t, Stmt -> list (Var t) -> Prop :=
-| block_loose_vars_nil: forall t,
-     StmtLooseVars t (block []) []
-| (* TBD *)
-*)
 
 
 (* check that procedure returns are ok *)
@@ -314,6 +260,9 @@ Inductive StmtVarRespectsT (t : Type) (s : string) : Stmt -> Prop :=
     StmtVarRespectsT t s (load t (var t s) l)
 | svrt_load_neq : forall t' s' l,
     s <> s' -> StmtVarRespectsT t s (load t' (var t' s') l)
+| svrt_scope : forall s1,
+    StmtVarRespectsT t s s1 ->
+    StmtVarRespectsT t s (scope s1)
 | svrt_if : forall b s1 s2,
     ExprVarRespectsT t s bool b -> StmtVarRespectsT t s s1 -> StmtVarRespectsT t s s2 ->
     StmtVarRespectsT t s (if_ b s1 s2)
@@ -348,12 +297,12 @@ Inductive ProcVarRespectsT pt rt: Proc pt rt -> Prop :=
 
 
 Definition StmtOk s : Prop :=
-   (forall t v (b : bool), StmtDeclaresVar t s v b) /\
-   (* (forall t, StmtLooseVars t s []) *) True.
+   (forall env env', VarsScopedStmt env s env') /\
+   (forall env', VarsUniqueStmt s env')
+.
 
-Inductive ProcOk: forall pt rt, Proc pt rt -> Prop :=
-| proc_ok: forall pt rt v s,
-     StmtOk s ->
-     ProcReturnOk pt rt (proc pt rt v s) ->
-     ProcOk pt rt (proc pt rt v s)
+Definition ProcOk pt rt (p: Proc pt rt): Prop :=
+   (VarsScopedProc pt rt p) /\
+   (VarsUniqueProc pt rt p) /\
+   ProcReturnOk pt rt p
 .

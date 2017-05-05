@@ -67,7 +67,7 @@ Inductive ExprYields: forall t, Locals -> Expr t -> t -> Prop :=
     ExprYields t loc (cond t e et ef) a
 | cond_false_yields: forall t loc e et ef a,
     ExprYields bool loc e false ->
-    ExprYields t loc et a ->
+    ExprYields t loc ef a ->
     ExprYields t loc (cond t e et ef) a
 .
 
@@ -97,15 +97,21 @@ Inductive StmtSteps: Heap -> Locals -> Stmt -> Heap -> Locals -> Stmt -> Prop :=
      lk = lock type inv -> addr_from_lock type lk = addr -> (* XXX *)
      ExprYields type loc e a ->
      StmtSteps h loc (store type lk e) (NatMap.add addr (mkval type a) h) loc skip
+| step_scope: forall h loc s h' loc' s',
+     StmtSteps h loc s h' loc' s' ->
+     StmtSteps h loc (scope s) h' loc' (scope s')
+| step_endscope: forall h loc,
+     StmtSteps h loc (scope skip) h loc skip
 | step_if_true: forall h loc e st sf,
      ExprYields bool loc e true ->
-     StmtSteps h loc (if_ e st sf) h loc st
+     StmtSteps h loc (if_ e st sf) h loc (scope st)
 | step_if_false: forall h loc e st sf,
      ExprYields bool loc e false ->
-     StmtSteps h loc (if_ e st sf) h loc sf
+     StmtSteps h loc (if_ e st sf) h loc (scope sf)
 | step_while_true: forall h loc e body,
      ExprYields bool loc e true ->
-     StmtSteps h loc (while e body) h loc (block [body; while e body])
+     StmtSteps h loc (while e body)
+               h loc (block [scope body; while e body])
 | step_while_false: forall h loc e body,
      ExprYields bool loc e false ->
      StmtSteps h loc (while e body) h loc skip

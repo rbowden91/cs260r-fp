@@ -5,6 +5,7 @@ Require Import List.
 Import ListNotations.
 
 Require Import ast.
+Require Import varmap.
 
 (* ************************************************************ *)
 (* ************************************************************ *)
@@ -14,14 +15,147 @@ Require Import ast.
 (* ************************************************************ *)
 (* ************************************************************ *)
 
-
 (*
  * well-formedness constraints
+ *
+ * we have the following constraints:
+ *   1. scoping: variables must be used only in their scope.
+ *   2. uniqueness: (local) variable identifiers must be unique across
+ *      each entire proc.
+ *   3. flow: variables must be declared before used.
+ *   4. typing: each local variable has exactly one type.
+ *
+ * "VarsScoped" covers #1 and #3.
+ * "VarsUnique" covers #2; it's separate because its environment is
+ *     different.
+ * "VarsTyped" covers #4.
+ *
+ * A proc is well-formed if it satisfies all these properties.
  *
  * this is (for now) chiefly about insisting that every variable is declared
  * exactly once. types are mostly enforced by the embedding. we ignore scopes
  * when checking for duplicate declarations, at least for now.
  *)
+
+(* scoping *)
+Check read.
+Inductive VarsScopedExpr: forall (t: Type), VarMap unit -> Expr t -> Prop :=
+| vars_scoped_value: forall (t: Type) env k,
+     VarsScopedExpr t env (value t k)
+| vars_scoped_read: forall (t: Type) env x,
+     VarMapIn x env ->
+     VarsScopedExpr t env (read t x)
+| vars_scoped_cond: forall t env pred te fe,
+     VarsScopedExpr bool env pred ->
+     VarsScopedExpr t env te ->
+     VarsScopedExpr t env fe ->
+     VarsScopedExpr t env (cond t pred te fe)
+.
+
+Inductive VarsScopedStmt: VarMap unit -> Stmt -> VarMap unit -> Prop :=
+| vars_scoped_block_nil: forall env,
+     VarsScopedStmt env (block []) env
+| vars_scoped_block_cons: forall env s env' ss env'',
+     VarsScopedStmt env s env' ->
+     VarsScopedStmt env' (block ss) env'' ->
+     VarsScopedStmt env (block (s :: ss)) env''
+| vars_scoped_start: forall env pt p e,
+     VarsScopedExpr pt env e ->
+     VarsScopedStmt env (start pt p e) env
+| vars_scoped_assign: forall t env x e,
+     VarMapIn x env ->
+     VarsScopedStmt env (assign t x e) env
+| vars_scoped_load: forall t env x l,
+     VarMapIn x env ->
+     VarsScopedStmt env (load t x l) env
+| vars_scoped_store: forall t env x l e,
+     @VarMapIn t unit x env ->
+     VarsScopedExpr t env e ->
+     VarsScopedStmt env (store t l e) env
+| vars_scoped_if: forall env pred ts fs env't env'f,
+     VarsScopedExpr bool env pred ->
+     VarsScopedStmt env ts env't ->
+     VarsScopedStmt env fs env'f ->
+     VarsScopedStmt env (if_ pred ts fs) env
+| vars_scoped_while: forall env pred body env'body,
+     VarsScopedExpr bool env pred ->
+     VarsScopedStmt env body env'body ->
+     VarsScopedStmt env (while pred body) env
+| vars_scoped_call: forall env pt rt x p arg,
+     VarsScopedProc pt rt p ->
+     VarsScopedExpr pt env arg ->
+     VarMapIn x env ->
+     VarsScopedStmt env (call pt rt x p arg) env
+| vars_scoped_local: forall t env x e,
+     VarsScopedExpr t env e ->
+     ~(VarMapIn x env) ->
+     VarsScopedStmt env (local t x e) (VarMap_add x tt(*unit*) env)
+| vars_scoped_return: forall t env e,
+     VarsScopedExpr t env e ->
+     VarsScopedStmt env (return_ t e) env
+| vars_scoped_getlock: forall t env l,
+     VarsScopedStmt env (getlock t l) env
+| vars_scoped_putlock: forall t env l,
+     VarsScopedStmt env (getlock t l) env
+with
+(*Inductive*) VarsScopedProc: forall pt rt, Proc pt rt -> Prop :=
+| vars_scoped_proc: forall pt rt x body env',
+     VarsScopedStmt (VarMap_add x tt(*unit*) (VarMap_empty unit)) body env' ->
+     VarsScopedProc pt rt (proc pt rt x body)
+.
+
+(* uniqueness *)
+
+(*
+ * This differs in that the environment doesn't nest. Also,
+ * it doesn't reason about exprs; it relies on VarsScoped to
+ * make sure they refer only to variables that exist.
+ *)
+
+Inductive VarsUniqueStmt: VarMap unit -> Stmt -> VarMap unit -> Prop :=
+| vars_unique_block_nil: forall env,
+     VarsUniqueStmt env (block []) env
+| vars_unique_block_cons: forall env s env' ss env'',
+     VarsUniqueStmt env s env' ->
+     VarsUniqueStmt env' (block ss) env'' ->
+     VarsUniqueStmt env (block (s :: ss)) env''
+| vars_unique_start: forall env pt p e,
+     VarsUniqueStmt env (start pt p e) env
+| vars_unique_assign: forall t env x e,
+     VarMapIn x env ->
+     VarsUniqueStmt env (assign t x e) env
+| vars_unique_load: forall t env x l,
+     VarMapIn x env ->
+     VarsUniqueStmt env (load t x l) env
+| vars_unique_store: forall t env l e,
+     VarsUniqueStmt env (store t l e) env
+| vars_unique_if: forall env cond ts fs env't env'f,
+     VarsUniqueStmt env ts env't ->
+     VarsUniqueStmt env fs env'f ->
+     VarMapDisjoint unit env't env'f ->
+     VarsUniqueStmt env (if_ cond ts fs) (VarMap_union env't env'f)
+| vars_unique_while: forall env cond body env'body,
+     VarsUniqueStmt env body env'body ->
+     VarsUniqueStmt env (while cond body) env'body
+| vars_unique_call: forall env pt rt x p arg,
+     VarsUniqueProc pt rt p ->
+     VarMapIn x env ->
+     VarsUniqueStmt env (call pt rt x p arg) env
+| vars_unique_local: forall env t x e,
+     ~(VarMapIn x env) ->
+     VarsUniqueStmt env (local t x e) (VarMap_add x tt(*unit*) env)
+| vars_unique_return: forall t env e,
+     VarsUniqueStmt env (return_ t e) env
+| vars_unique_getlock: forall t env l,
+     VarsUniqueStmt env (getlock t l) env
+| vars_unique_putlock: forall t env l,
+     VarsUniqueStmt env (getlock t l) env
+with
+(*Inductive*) VarsUniqueProc: forall pt rt, Proc pt rt -> Prop :=
+| vars_unique_proc: forall pt rt x body env',
+     VarsUniqueStmt (VarMap_add x tt(*unit*) (VarMap_empty unit)) body env' ->
+     VarsUniqueProc pt rt (proc pt rt x body)
+.
 
 (* check that variable declarations are unique *)
 Inductive StmtDeclaresVar: forall t, Stmt -> Var t -> bool -> Prop :=
@@ -90,7 +224,7 @@ Inductive StmtEndsInReturn: Stmt -> Type -> Prop :=
 | return_ends_in_return: forall t e,
      StmtEndsInReturn (return_ t e) t
 with
-(*Inductive*) ProcReturnOk: forall (pt : Set) rt, Proc pt rt -> Prop :=
+(*Inductive*) ProcReturnOk: forall pt rt, Proc pt rt -> Prop :=
 | proc_return_ok: forall pt rt v s,
      StmtEndsInReturn s rt ->
      ProcReturnOk pt rt (proc pt rt v s)
@@ -151,7 +285,7 @@ Inductive InStmt : forall t, Var t -> Stmt -> Prop :=
 (* Inductive InProc := . *)
 
 (* does this expression respect the usage of varname s to denote a type t? *)
-Inductive ExprVarRespectsT (t : Set) (s : string) : forall t', Expr t' -> Prop :=
+Inductive ExprVarRespectsT (t : Type) (s : string) : forall t', Expr t' -> Prop :=
 | evrt_value : forall t' exp,
     ExprVarRespectsT t s t' (value t' exp)
 | evrt_read_eq : (* expr type had better be the same *)
@@ -165,7 +299,7 @@ Inductive ExprVarRespectsT (t : Set) (s : string) : forall t', Expr t' -> Prop :
 
 (* does this statement respect the usage of varname s to denote a type t? *)
 (* XXX note that in both of these, non-usage counts as respectful! *)
-Inductive StmtVarRespectsT (t : Set) (s : string) : Stmt -> Prop :=
+Inductive StmtVarRespectsT (t : Type) (s : string) : Stmt -> Prop :=
 | svrt_block_nil : StmtVarRespectsT t s (block [])
 | svrt_block_cons : forall st sts,
     StmtVarRespectsT t s st -> StmtVarRespectsT t s (block sts) ->
@@ -205,7 +339,7 @@ Inductive StmtVarRespectsT (t : Set) (s : string) : Stmt -> Prop :=
 (* Print StmtVarRespectsT. *)
 
 (* does a proc respect variable usage? *)
-Inductive ProcVarRespectsT (pt : Set) (rt : Set) : Proc pt rt -> Prop :=
+Inductive ProcVarRespectsT pt rt: Proc pt rt -> Prop :=
 | pvrt : forall s st,
     StmtVarRespectsT pt s st ->
     (forall t s, InStmt t (var t s) st -> StmtVarRespectsT t s st) ->

@@ -30,12 +30,12 @@ Hypothesis undefined: forall T, T.
  * the most ... bastardized fs model
  *)
 
-Inductive caponvnode: Type :=
+Inductive caponvnode: Set :=
 | capondir: nat -> dir_trace -> caponvnode
 | caponfile: nat -> file_trace -> caponvnode
 .
 
-Inductive caponfs: Type :=
+Inductive caponfs :=
 | capon: NatMap.t caponvnode -> caponfs
 .
 

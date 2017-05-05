@@ -12,4 +12,4 @@
 
 
 (* For now, each unit of a file is a nat. *)
-Definition bytes : Type := list nat.
+Definition bytes : Set := list nat.

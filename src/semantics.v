@@ -44,7 +44,7 @@ Hypotheses addr_from_lock: forall t, Lock t -> nat.
 
 Section Stores.
 
-Inductive val: Type := mkval (t: Set) (a : t): val.
+Inductive val: Type := mkval (t: Type) (a : t): val.
 
 Definition Heap := NatMap.t val.
 Definition Locals := StringMap.t val.

@@ -178,6 +178,8 @@ End dirtraces.
 
 Section vfsobjects.
 
+Definition Pair (t1 t2: Set): Set := (t1 * t2)%type.
+
 Class vnodeclass (vnode : Type) := {
   inum_of_vnode: vnode -> nat;
   isdir: vnode -> bool;
@@ -190,7 +192,7 @@ Class vnodeclass (vnode : Type) := {
   foo_spec: ProcHoare unit unit (fun _ => True) foo (fun _ _ => True);
 *)
 
-  VOP_LOOKUP: Proc (vnode * string) (option vnode);
+  VOP_LOOKUP: Proc (vnode * string)%type (option vnode);
   lookup_spec: forall t,
      ProcHoare
         (vnode * string) (option vnode)

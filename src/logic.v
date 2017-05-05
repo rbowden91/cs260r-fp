@@ -26,7 +26,7 @@ Inductive ExprHoare: forall t, Prop -> Expr t -> (t -> Prop) :=
 Inductive StmtHoare: Prop -> Stmt -> Prop -> Prop :=
 | StmtTriple: forall p s q, StmtHoare p s q.
 
-Inductive ProcHoare: forall pt rt,
+Inductive ProcHoare: forall (pt rt: Type),
       (pt -> Prop) -> Proc pt rt -> (pt -> rt -> Prop) -> Prop :=
 | ProcTriple: forall pt rt p s q, ProcHoare pt rt p s q.
 

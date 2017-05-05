@@ -42,8 +42,8 @@ Inductive VarsScopedExpr: forall (t: Type), VarMap Type -> Expr t -> Prop :=
 | vars_scoped_value: forall (t: Type) env k,
      VarsScopedExpr t env (value t k)
 | vars_scoped_read: forall (t: Type) env id,
-     VarMapMapsTo (var t id) t env ->
-     VarsScopedExpr t env (read t (var t id))
+     VarMapMapsTo (mkvar t id) t env ->
+     VarsScopedExpr t env (read t (mkvar t id))
 | vars_scoped_cond: forall t env pred te fe,
      VarsScopedExpr bool env pred ->
      VarsScopedExpr t env te ->
@@ -63,13 +63,13 @@ Inductive VarsScopedStmt: VarMap Type -> Stmt -> VarMap Type -> Prop :=
      VarsScopedStmt env (start pt p e) env
 | vars_scoped_assign: forall t env id e,
      VarsScopedExpr t env e ->
-     VarMapMapsTo (var t id) t env ->
-     VarsScopedStmt env (assign t (var t id) e) env
+     VarMapMapsTo (mkvar t id) t env ->
+     VarsScopedStmt env (assign t (mkvar t id) e) env
 | vars_scoped_load: forall t env id l,
-     VarMapMapsTo (var t id) t env ->
-     VarsScopedStmt env (load t (var t id) l) env
+     VarMapMapsTo (mkvar t id) t env ->
+     VarsScopedStmt env (load t (mkvar t id) l) env
 | vars_scoped_store: forall t env id l e,
-     @VarMapMapsTo t Type (var t id) t env ->
+     @VarMapMapsTo t Type (mkvar t id) t env ->
      VarsScopedExpr t env e ->
      VarsScopedStmt env (store t l e) env
 | vars_scoped_scope: forall env s env',
@@ -87,12 +87,12 @@ Inductive VarsScopedStmt: VarMap Type -> Stmt -> VarMap Type -> Prop :=
 | vars_scoped_call: forall env pt rt id p arg,
      VarsScopedProc pt rt p ->
      VarsScopedExpr pt env arg ->
-     VarMapMapsTo (var rt id) rt env ->
-     VarsScopedStmt env (call pt rt (var rt id) p arg) env
+     VarMapMapsTo (mkvar rt id) rt env ->
+     VarsScopedStmt env (call pt rt (mkvar rt id) p arg) env
 | vars_scoped_local: forall t env id e,
      VarsScopedExpr t env e ->
-     ~(VarMapIn (var t id) env) ->
-     VarsScopedStmt env (local t (var t id) e) (VarMap_add (var t id) t env)
+     ~(VarMapIn (mkvar t id) env) ->
+     VarsScopedStmt env (local t (mkvar t id) e) (VarMap_add (mkvar t id) t env)
 | vars_scoped_return: forall t env e,
      VarsScopedExpr t env e ->
      VarsScopedStmt env (return_ t e) env
@@ -103,8 +103,8 @@ Inductive VarsScopedStmt: VarMap Type -> Stmt -> VarMap Type -> Prop :=
 with
 (*Inductive*) VarsScopedProc: forall pt rt, Proc pt rt -> Prop :=
 | vars_scoped_proc: forall pt rt id body env',
-     VarsScopedStmt (VarMap_add (var pt id) pt (VarMap_empty Type)) body env' ->
-     VarsScopedProc pt rt (proc pt rt (var pt id) body)
+     VarsScopedStmt (VarMap_add (mkvar pt id) pt (VarMap_empty Type)) body env' ->
+     VarsScopedProc pt rt (proc pt rt (mkvar pt id) body)
 .
 
 (* uniqueness *)
@@ -235,9 +235,9 @@ Inductive ExprVarRespectsT (t : Type) (s : varidtype) : forall t', Expr t' -> Pr
 | evrt_value : forall t' exp,
     ExprVarRespectsT t s t' (value t' exp)
 | evrt_read_eq : (* expr type had better be the same *)
-    ExprVarRespectsT t s t (read t (var t s))
+    ExprVarRespectsT t s t (read t (mkvar t s))
 | evrt_read_neq : forall t' s', (* don't care about expr type *)
-    s <> s' -> ExprVarRespectsT t s t' (read t' (var t' s'))
+    s <> s' -> ExprVarRespectsT t s t' (read t' (mkvar t' s'))
 | evrt_cond : forall t' b exp1 exp2,
     ExprVarRespectsT t s bool b -> ExprVarRespectsT t s t' exp1 -> ExprVarRespectsT t s t' exp2 ->
     ExprVarRespectsT t s t' (cond t' b exp1 exp2)
@@ -253,13 +253,13 @@ Inductive StmtVarRespectsT (t : Type) (s : varidtype) : Stmt -> Prop :=
 | svrt_start : forall pt p e,
     ExprVarRespectsT t s pt e -> StmtVarRespectsT t s (start pt p e)
 | svrt_assign_eq : forall e,
-    ExprVarRespectsT t s t e -> StmtVarRespectsT t s (assign t (var t s) e)
+    ExprVarRespectsT t s t e -> StmtVarRespectsT t s (assign t (mkvar t s) e)
 | svrt_assign_neq : forall t' s' e,
-    s <> s' -> ExprVarRespectsT t s t' e -> StmtVarRespectsT t s (assign t' (var t' s') e)
+    s <> s' -> ExprVarRespectsT t s t' e -> StmtVarRespectsT t s (assign t' (mkvar t' s') e)
 | svrt_load_eq : forall l,
-    StmtVarRespectsT t s (load t (var t s) l)
+    StmtVarRespectsT t s (load t (mkvar t s) l)
 | svrt_load_neq : forall t' s' l,
-    s <> s' -> StmtVarRespectsT t s (load t' (var t' s') l)
+    s <> s' -> StmtVarRespectsT t s (load t' (mkvar t' s') l)
 | svrt_scope : forall s1,
     StmtVarRespectsT t s s1 ->
     StmtVarRespectsT t s (scope s1)
@@ -269,13 +269,13 @@ Inductive StmtVarRespectsT (t : Type) (s : varidtype) : Stmt -> Prop :=
 | svrt_while : forall b st,
     ExprVarRespectsT t s bool b -> StmtVarRespectsT t s st -> StmtVarRespectsT t s (while b st)
 | svrt_call_eq : forall pt p exp,
-    ExprVarRespectsT t s pt exp -> StmtVarRespectsT t s (call pt t (var t s) p exp)
+    ExprVarRespectsT t s pt exp -> StmtVarRespectsT t s (call pt t (mkvar t s) p exp)
 | svrt_call_neq : forall t' s' pt p exp,
-    s <> s' -> ExprVarRespectsT t s pt exp -> StmtVarRespectsT t s (call pt t' (var t' s') p exp)
+    s <> s' -> ExprVarRespectsT t s pt exp -> StmtVarRespectsT t s (call pt t' (mkvar t' s') p exp)
 | svrt_local_eq : forall e,
-    ExprVarRespectsT t s t e -> StmtVarRespectsT t s (local t (var t s) e)
+    ExprVarRespectsT t s t e -> StmtVarRespectsT t s (local t (mkvar t s) e)
 | svrt_local_neq : forall t' s' e,
-    s <> s' -> ExprVarRespectsT t s t' e -> StmtVarRespectsT t s (local t' (var t' s') e)
+    s <> s' -> ExprVarRespectsT t s t' e -> StmtVarRespectsT t s (local t' (mkvar t' s') e)
 | svrt_return : forall t' e,
     ExprVarRespectsT t s t' e -> StmtVarRespectsT t s (return_ t' e)
 (* XXX *)
@@ -291,8 +291,8 @@ Inductive StmtVarRespectsT (t : Type) (s : varidtype) : Stmt -> Prop :=
 Inductive ProcVarRespectsT pt rt: Proc pt rt -> Prop :=
 | pvrt : forall s st,
     StmtVarRespectsT pt s st ->
-    (forall t s, InStmt t (var t s) st -> StmtVarRespectsT t s st) ->
-    ProcVarRespectsT pt rt (proc pt rt (var pt s) st)
+    (forall t s, InStmt t (mkvar t s) st -> StmtVarRespectsT t s st) ->
+    ProcVarRespectsT pt rt (proc pt rt (mkvar pt s) st)
 .
 
 

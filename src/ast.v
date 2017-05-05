@@ -28,12 +28,12 @@ Inductive Invariant : Set -> Type :=
 
 (* locks are a special class of variables *)
 Inductive Lock: Type -> Type :=
-| lock : forall t, Invariant t -> Lock t
+| mklock : forall t, Invariant t -> Lock t
 .
 
 (* variables are identified with numbers *)
 Inductive Var: Type -> Type :=
-| var: forall t, nat -> Var t
+| mkvar: forall t, nat -> Var t
 .
 
 (*

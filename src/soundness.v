@@ -23,7 +23,7 @@ Require Import semantics.
 (* env is sound relative to tyenv *)
 Definition localenv_sound_new (tyenv: VarMap Type) (env: Locals): Prop :=
    forall t id,
-      VarMapMapsTo (var t id) t tyenv ->
+      VarMapMapsTo (mkvar t id) t tyenv ->
       exists a, NatMap.MapsTo id (mkval t a) env.
 
 Definition localenv_sound (env: Locals) (prog : Stmt): Prop :=
@@ -228,9 +228,9 @@ Admitted.
 Lemma localenv_sound_addition:
    forall tyenv loc t id a,
    localenv_sound_new tyenv loc ->
-   ~(VarMapIn (var t id) tyenv) ->
+   ~(VarMapIn (mkvar t id) tyenv) ->
    localenv_sound_new
-        (VarMap_add (var t id) t tyenv)
+        (VarMap_add (mkvar t id) t tyenv)
         (NatMap.add id (mkval t a) loc).
 Proof.
    unfold localenv_sound_new.
@@ -261,7 +261,7 @@ Qed.
 Lemma localenv_sound_replacement:
    forall tyenv loc t id a,
    localenv_sound_new tyenv loc ->
-   VarMapMapsTo (var t id) t tyenv ->
+   VarMapMapsTo (mkvar t id) t tyenv ->
    localenv_sound_new tyenv (NatMap.add id (mkval t a) loc).
 Proof.
    unfold localenv_sound_new.

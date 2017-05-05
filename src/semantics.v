@@ -59,7 +59,7 @@ Section Expressions.
 Inductive ExprYields: forall t, Locals -> Expr t -> t -> Prop :=
 | value_yields: forall loc t a, ExprYields t loc (value t a) a
 | read_yields: forall loc t (x : Var t) id a,
-    x = var t id -> NatMap.find id loc = Some (mkval t a) ->
+    x = mkvar t id -> NatMap.find id loc = Some (mkval t a) ->
     ExprYields t loc (read t x) a
 | cond_true_yields: forall t loc e et ef a,
     ExprYields bool loc e true ->
@@ -87,13 +87,13 @@ Inductive StmtSteps: Heap -> Locals -> Stmt -> Heap -> Locals -> Stmt -> Prop :=
      StmtSteps h loc (block (skip :: more)) h loc (block more)
 | step_assign: forall h loc id type e a,
      ExprYields type loc e a ->
-     StmtSteps h loc (assign type (var type id) e) h (NatMap.add id (mkval type a) loc) skip
+     StmtSteps h loc (assign type (mkvar type id) e) h (NatMap.add id (mkval type a) loc) skip
 | step_load: forall h loc id type inv lk addr a,
-     lk = lock type inv -> addr_from_lock type lk = addr -> (* XXX *)
+     lk = mklock type inv -> addr_from_lock type lk = addr -> (* XXX *)
      NatMap.find addr h = Some (mkval type a) ->
-     StmtSteps h loc (load type (var type id) lk) h (NatMap.add id (mkval type a) loc) skip
+     StmtSteps h loc (load type (mkvar type id) lk) h (NatMap.add id (mkval type a) loc) skip
 | step_store: forall h loc type inv lk addr e a,
-     lk = lock type inv -> addr_from_lock type lk = addr -> (* XXX *)
+     lk = mklock type inv -> addr_from_lock type lk = addr -> (* XXX *)
      ExprYields type loc e a ->
      StmtSteps h loc (store type lk e) (NatMap.add addr (mkval type a) h) loc skip
 | step_scope: forall h loc s h' loc' s',
@@ -117,7 +117,7 @@ Inductive StmtSteps: Heap -> Locals -> Stmt -> Heap -> Locals -> Stmt -> Prop :=
 | step_local: forall h loc id type e a,
      NatMap.find id loc = None ->
      ExprYields type loc e a ->
-     StmtSteps h loc (local type (var type id) e) h (NatMap.add id (mkval type a) loc) skip
+     StmtSteps h loc (local type (mkvar type id) e) h (NatMap.add id (mkval type a) loc) skip
 (* XXX
 | step_getlock: ?
 | step_putlock: ?
@@ -157,19 +157,19 @@ Inductive ThreadSteps: Heap -> Thread -> Heap -> Thread -> Prop :=
 			loc
 			stk
 			(call pt rt
-				(var rt retid)
-				(proc pt rt (var pt paramid) body)
+				(mkvar rt retid)
+				(proc pt rt (mkvar pt paramid) body)
 				arg)
 		 )
 		 h (thread
 			(NatMap.add paramid (mkval pt argval) (NatMap.empty val))
-			(stack_pending rt loc (var rt retid) stk)
+			(stack_pending rt loc (mkvar rt retid) stk)
 			body
 		 )
 | thread_steps_return: forall h loc loc' rt retid stk ret retval retvalXXX,
      ExprYields rt loc ret retval ->
-     ThreadSteps h (thread loc (stack_pending rt loc' (var rt retid) stk) (return_ rt ret))
-                 h (thread loc' stk (assign rt (var rt retid) (value rt retvalXXX)))
+     ThreadSteps h (thread loc (stack_pending rt loc' (mkvar rt retid) stk) (return_ rt ret))
+                 h (thread loc' stk (assign rt (mkvar rt retid) (value rt retvalXXX)))
 .
 
 (* this is its own thing because it needs a different signature *)
@@ -177,7 +177,7 @@ Inductive ThreadStepsStart: Thread -> Thread -> Thread -> Prop :=
 | thread_steps_start: forall loc stk pt paramid body arg argval,
      ExprYields pt loc arg argval ->
      ThreadStepsStart
-	(thread loc stk (start pt (proc pt unit (var pt paramid) body) arg))
+	(thread loc stk (start pt (proc pt unit (mkvar pt paramid) body) arg))
         (thread loc stk skip)
 	(thread (NatMap.add paramid (mkval pt argval) (NatMap.empty val)) stack_empty body)
 .

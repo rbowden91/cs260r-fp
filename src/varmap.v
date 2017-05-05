@@ -29,7 +29,7 @@ Require Import ast.
 
 Definition var_id {t} (x: Var t) :=
    match x with
-   | var _ id => id
+   | mkvar _ id => id
    end.
 
 Definition varidtype := nat.

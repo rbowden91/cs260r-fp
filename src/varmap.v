@@ -54,6 +54,8 @@ Definition VarMap_union {t} m1 m2 := @StringMap_union t m1 m2.
 Definition VarMapDisjoint := StringMapProperties.Disjoint.
 Definition VarMapIn {t} {t2} (k: Var t) (m: StringMap.t t2) :=
    StringMap.In (var_id k) m.
+Definition VarMapMapsTo {t} {t2} (k: Var t) (v: t2) (m: StringMap.t t2) :=
+   StringMap.MapsTo (var_id k) v m.
 
 (*
 Module NatMap := FMapList.Make Nat_as_OT.

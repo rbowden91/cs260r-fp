@@ -15,6 +15,9 @@ Import ListNotations.
 
 Require Import table.
 
+Definition env := table var value.
+Definition state := table lock value.
+
 
 
 Definition world := (lock -> option value)%type.

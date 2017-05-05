@@ -1,19 +1,23 @@
+Require Import msl.base.
+
 Require Import msl.msl_direct.
 Require Import msl.seplog.
+
 Require Import msl.alg_seplog_direct.
+
+
 Require Import msl.Coqlib2.
-Require Import veric.lift.
 Require Import msl.log_normalize.
+
 Require Import ast.
 Require Import List.
 Import ListNotations.
 
-Definition world := ((addr -> option value) * (disk_addr -> option value))%type.
+Definition world := (lock -> option value)%type.
 
 Instance Join_world: Join world :=
-	Join_prod
-	    (addr -> option value) (Join_fun addr (option value) (Join_lower (Join_discrete value)))
-	    (disk_addr -> option value) (Join_fun disk_addr (option value) (Join_lower (Join_discrete value))).
+	Join_fun lock (option value) (Join_lower (Join_discrete value)).
+
 
 Instance Perm_world : Perm_alg world := _.
 Instance Sep_world : Sep_alg world := _.
@@ -21,17 +25,20 @@ Instance Canc_world : Canc_alg world := _.
 Proof.
 Admitted.
 
+Instance Sing_world : Sing_alg world := _.
+Proof.
+Admitted.
+
 Instance Disj_world : Disj_alg world := _.
 Proof.
 Admitted.
-Instance Nm: NatDed (pred world) := _.
+
+Instance Cw: ClassicalSep (pred world) := _.
+Instance Nw: NatDed (pred world) := _.
 
 Definition assertion := env -> pred world.
 
-Definition get_heap {A B} (w:A*B) := fst w.
-Definition get_disk {A B} (w:A*B) := snd w.
-
-Definition den (s: state) : world := (table_get (get_heap s), table_get (get_disk s)).
+Definition den (s: state) : world := (table_get s).
 
 Definition defined (x: var) : assertion :=
    fun rho => fun w => exists v, table_get rho x = Some v.
@@ -60,8 +67,8 @@ Inductive modvars : stmt -> var -> Prop :=
 | mod_assign: forall x e, modvars (s_assign x e) x
 | mod_load: forall x l, modvars (s_load x l) x
 | mod_call: forall x p e, modvars (s_call x p e) x
-| mod_block1: forall x s ss, modvars s x -> modvars (s_block (s :: ss)) x
-| mod_block2: forall x s ss, modvars (s_block ss) x -> modvars (s_block (s :: ss)) x
+| mod_seq1: forall x s1 s2, modvars s1 x -> modvars (s_seq s1 s2) x
+| mod_seq2: forall x s1 s2, modvars s2 x -> modvars (s_seq s1 s2) x
 (* XXX can say something about e evaluating to true/false? *)
 | mod_if1: forall x e s1 s2, modvars s1 x -> modvars (s_if e s1 s2) x
 | mod_if2: forall x e s1 s2, modvars s2 x -> modvars (s_if e s1 s2) x
@@ -97,7 +104,7 @@ Function typeof_val (v : value) (t : type) : Prop :=
   match v with
   | v_nat _ => t_nat = t
   | v_bool _ => t_bool = t
-  | v_addr _ => t_addr = t
+  | v_lock (n,b,t') => t_lock t' = t
   | v_undef => False
   end.
 
@@ -114,11 +121,21 @@ Function typeof_expr (e : expr) (rho : env) (t : type) : Prop :=
     typeof_expr e2 rho t
   end.
 
+Lemma tt_sound :
+  forall {v} {a : value} {rho : env}, table_get rho v = Some a ->
+  typeof_val a (snd v).
+Proof.
+Admitted.
+
+Notation ETT := (fun (_ : env) => TT).
+Notation EFF := (fun (_ : env) => FF).
+
+(*
 Definition lift0 {B} (P: B) : env -> B := fun _ => P.
 Definition lift1 {A1 B} (P: A1 -> B) (f1: env -> A1) : env -> B := fun rho => P (f1 rho).
 Definition lift2 {A1 A2 B} (P: A1 -> A2 -> B) (f1: env -> A1) (f2: env -> A2):
    env -> B := fun rho => P (f1 rho) (f2 rho).
-
+*)
 (*Definition local: (world -> Prop) -> world -> pred world :=  lift1 prop.*)
 Local Open Scope logic.
 Definition assign_forward (v : var) (e : expr) (P : assertion) (rho : env) := 
@@ -126,61 +143,52 @@ Definition assign_forward (v : var) (e : expr) (P : assertion) (rho : env) :=
     (!!(table_get rho v = Some (eval_expr e (table_set v old rho)))
     && P (table_set v old rho)).
 
-
-
 Inductive hoare_stmt :
   (value -> pred world) -> (* retC *)
   (value -> pred world) -> (* ret *)
-  (*(lock_type -> addr -> (s_prop * s_prop)) -> *)
+  (lock -> pred world * pred world) -> (* lk_invs *)
   assertion -> assertion -> stmt -> assertion -> assertion -> Prop :=
 
-| ht_skip : forall retC ret,
+| ht_skip : forall retC ret lk_invs,
             forall P C,
-            hoare_stmt retC ret
-                       C P (skip) C P
+            hoare_stmt retC ret lk_invs
+                       C P (s_skip) C P
 
-| ht_block : forall retC ret,
-             forall PC RC QC P R Q s ss,
-             hoare_stmt retC ret
-                        PC P s RC R ->
-             hoare_stmt retC ret
-                        RC R (s_block ss) QC Q ->
-             hoare_stmt retC ret
-                        PC P (s_block (s::ss)) QC Q
+| ht_seq : forall retC ret lk_invs,
+             forall PC RC QC P R Q s1 s2,
+             hoare_stmt retC ret lk_invs
+                        PC P s1 RC R ->
+             hoare_stmt retC ret lk_invs
+                        RC R s2 QC Q ->
+             hoare_stmt retC ret lk_invs
+                        PC P (s_seq s1 s2) QC Q
 
-| ht_if : forall retC ret,
+| ht_if : forall retC ret lk_invs,
           forall PC QC P Q e_b s1 s2,
-          hoare_stmt retC ret
+          hoare_stmt retC ret lk_invs
                      PC (fun rho => P rho && !!((eq (v_bool true) (eval_expr e_b rho)))) s1 QC Q ->
-          hoare_stmt retC ret
+          hoare_stmt retC ret lk_invs
                      PC (fun rho => P rho && !!((eq (v_bool false) (eval_expr e_b rho)))) s2 QC Q ->
-          hoare_stmt retC ret
+          hoare_stmt retC ret lk_invs
                      PC P (s_if e_b s1 s2) QC Q
 
-| ht_return : forall retC ret,
+| ht_return : forall retC ret lk_invs,
               forall e PC P,
               (forall rho, PC rho |-- retC (eval_expr e rho)) ->
               (forall rho, P rho |-- ret (eval_expr e rho)) ->
-              hoare_stmt retC ret
-                         PC P (s_return e) FF FF
-(*
-| ht_return : forall retC ret,
-              forall e,
-              hoare_stmt retC ret
-                         (fun rho => retC (eval_expr e rho)) 
-                         (fun rho => ret (eval_expr e rho)) 
-                         (s_return e) FF FF
-*)
-| ht_while : forall retC ret,
+              hoare_stmt retC ret lk_invs
+                         PC P (s_return e) ETT EFF
+
+| ht_while : forall retC ret lk_invs,
              forall C P e_b s,
-             hoare_stmt retC ret
+             hoare_stmt retC ret lk_invs
                         C (fun rho => P rho && !!(eq (v_bool true) (eval_expr e_b rho))) s C P ->
-             hoare_stmt retC ret
+             hoare_stmt retC ret lk_invs
                         C P (s_while e_b s) C (fun rho => P rho && !!(eq (v_bool false) (eval_expr e_b rho)))
 
-| ht_assign : forall retC ret,
+| ht_assign : forall retC ret lk_invs,
               forall C P v e,
-              hoare_stmt retC ret
+              hoare_stmt retC ret lk_invs
                            C
                            (fun rho => P rho && !!(typeof_expr e rho (snd v)))
                              (s_assign v e)
@@ -188,48 +196,68 @@ Inductive hoare_stmt :
                            (assign_forward v e P)
 
 (* XXX special frame for PC and QC. Also, this seems to weakly constrain the old rv... *)
-| ht_call : forall retC ret,
-            forall F PC P QC Q rv rt pv s e val,
-            hoare_proc PC P (p_proc rt pv s) QC Q ->
-            hoare_stmt retC ret
-                       (fun rho => PC (eval_expr e rho))
-                       (fun rho => F rho * P (eval_expr e rho))
+(* XXX XXX XXX Just force rv to be a new var for now... *)
+| ht_call : forall {retC ret lk_invs},
+            forall {PC PC' P P' QC QC' Q Q' rv rt pv s e val},
+            hoare_proc lk_invs PC P (p_proc rt pv s) QC Q ->
+            (forall rho, PC' rho |-- PC (eval_expr e rho)) ->
+            (forall rho, P' rho |-- P (eval_expr e rho)) ->
+            hoare_stmt retC ret lk_invs
+                       PC'
+                       P'
                            (s_call rv (p_proc rt pv s) e)
-                       (fun rho => EX old:value,
-                                       ((*F (table_set rv old rho) **)
+                       (fun rho => !!(table_get rho rv = Some val) &&
+                                   QC' rho *
+                                   QC (eval_expr e rho) val)
+                       (fun rho => !!(table_get rho rv = Some val) &&
+                                   Q' rho *
+                                   Q (eval_expr e rho) val)
+
+(*
+                       (fun rho => !!(table_get rho rv = Some val) &&
+                                   EX old:value,
+                                       (QC' (table_set rv old rho) *
                                        QC (eval_expr e (table_set rv old rho)) val))
                        (fun rho => !!(table_get rho rv = Some val) &&
                                    EX old:value,
-                                       (F (table_set rv old rho) *
+                                       (Q' (table_set rv old rho) *
                                        Q (eval_expr e (table_set rv old rho)) val))
+*)
+
+| ht_getlock : forall retC ret lk_invs,
+               forall lk,
+               hoare_stmt retC ret lk_invs
+                          (fun rho => emp) (fun rho => emp)
+                            (s_getlock lk)
+                          (fun rho => fst (lk_invs lk)) (fun rho => snd (lk_invs lk))
 
 (* Stmt rules not directly related to the language *)
-| ht_consequence : forall retC ret,
+| ht_consequence : forall retC ret lk_invs,
                    forall PC PC' QC QC' P P' Q Q' s,
-                   hoare_stmt retC ret
+                   hoare_stmt retC ret lk_invs
                               PC P s QC Q ->
 (* XXX  want these? *)
                    (forall rho, PC rho |-- PC' rho) -> 
                    (forall rho, QC' rho |-- QC rho) -> 
                    (forall rho, P' rho |-- P rho) ->
                    (forall rho, Q rho |-- Q' rho) ->
-                   hoare_stmt retC ret
+                   hoare_stmt retC ret lk_invs
                               PC' P' s QC' Q'
 
 (* XXX something about modified vars in R? *)
-| ht_frame : forall retC ret,
+| ht_frame : forall retC ret lk_invs,
              forall PC QC P Q R s,
-             hoare_stmt retC ret
+             hoare_stmt retC ret lk_invs
                         PC P s QC Q ->
-             hoare_stmt retC ret
+             hoare_stmt retC ret lk_invs
                         PC (fun rho => (P rho) * (R rho)) s QC (fun rho => (Q rho) * (R rho))
 
 (*
-| ht_frame_crash : forall retC ret,
+| ht_frame_crash : forall retC ret lk_invs,
                    forall PC QC P Q R s,
-                   hoare_stmt retC ret
+                   hoare_stmt retC ret lk_invs
                               PC P s QC Q ->
-                   hoare_stmt retC ret
+                   hoare_stmt retC ret lk_invs
                               (fun rho => (PC rho) * (R rho))
                               (fun rho => (P rho) * (R rho) * l) 
                                   s 
@@ -242,54 +270,133 @@ Inductive hoare_stmt :
 (* These *don't* take assertions, because (for now) they don't need to take
  * the environment (argument / return value are explicitly passed in) *)
 with hoare_proc :
+  (lock -> pred world * pred world) ->
   (value -> pred world) -> (value -> pred world) -> proc -> 
   (value -> value -> pred world) -> (value -> value -> pred world) -> Prop :=
-| ht_proc : forall PC QC P Q t v s,
+| ht_proc : forall PC QC P Q t v s lk_invs,
                (forall a, hoare_stmt (QC a) 
                                      (fun r => !!(typeof_val r t) && Q a r)
+                                     lk_invs
                                      (fun rho => PC a)
                                      (fun rho => !!(typeof_val a (snd v)) && 
                                                  !!(table_get rho v = Some a) && P a)
                                      s
-                                     FF
-                                     FF) ->
-               hoare_proc PC P (p_proc t v s) QC Q.
+                                     ETT
+                                     EFF) ->
+               hoare_proc lk_invs PC P (p_proc t v s) QC Q.
 
-Notation "{{ retC }} {{ ret }} ||- {{ PC }} {{ P }} c {{ QC }} {{ Q }}" :=
-  (hoare_stmt retC ret PC P c QC Q) (at level 90, c at next level).
+Notation "{{ retC }} {{ ret }} {{ lk_invs }} ||- {{ PC }} {{ P }} s {{ QC }} {{ Q }}" :=
+  (hoare_stmt retC ret lk_invs PC P s QC Q) (at level 90, s at next level).
 
-Notation "{{{ PC }}} {{{ P }}} p {{{ QC }}} {{{ Q }}}" :=
-  (hoare_proc PC P p QC Q) (at level 90, p at next level).
+Notation "'Return-Crash:' retC 'Return:' ret 'Lock-Invs:' lk_invs 'Pre-Crash:' PC 'Pre:' P 'Post-Crash:' QC 'Post:' Q 'Stmt:' s" :=
+  (hoare_stmt retC ret lk_invs PC P s QC Q) (at level 89, s at next level, format
+      "'[v' 'Return-Crash:' '[  ' '/'  retC ']' '//' 'Return:' '[  ' '/'  ret ']' '//' 'Lock-Invs:' '[  ' '/'  lk_invs ']' '//' 'Pre-Crash:' '[  ' '/'  PC ']' '//' 'Pre:' '[  ' '/'  P ']' '//' 'Post-Crash:' '[  ' '/'  QC ']' '//' 'Post:' '[  ' '/'  Q ']' '//' 'Stmt:' '[  ' '/'  s ']' ']'").
 
+Notation "{{{ lk_invs }}} {{{ PC }}} {{{ P }}} p {{{ QC }}} {{{ Q }}}" :=
+  (hoare_proc lk_invs PC P p QC Q) (at level 90, p at next level).
 
-Definition example1 :=
-  p_proc t_nat (4,t_nat) (s_block [
-    s_return (e_read (4,t_nat))
-  ]).
-
-Lemma pre_false : forall rc r s QC Q,
-  {{ rc }} {{ r }} ||-
-  {{FF}} {{FF}} s {{ QC }} {{ Q }}.
+Lemma ht_pc_consequence : forall retC ret lk_invs PC PC' P s QC Q,
+  PC |-- PC' ->
+  hoare_stmt retC ret lk_invs PC P s QC Q ->
+  hoare_stmt retC ret lk_invs PC' P s QC Q.
 Proof.
   intros.
-  induction s; admit.
-(*
-  induction l.
-  apply ht_consequence with (P:=Q)(PC:=QC)(Q:=Q); norm.
-  apply ht_skip.
+  eapply ht_consequence; eauto.
+Qed.
 
-  apply ht_block with (R:=FF) (RC:=FF).
+Lemma ht_p_consequence : forall retC ret lk_invs PC P P' s QC Q,
+  P' |-- P ->
+  hoare_stmt retC ret lk_invs PC P s QC Q ->
+  hoare_stmt retC ret lk_invs PC P' s QC Q.
+Proof.
+  intros.
+  eapply ht_consequence; eauto.
+Qed.
+
+Lemma ht_qc_consequence : forall retC ret lk_invs PC P s QC QC' Q,
+  QC' |-- QC ->
+  hoare_stmt retC ret lk_invs PC P s QC Q ->
+  hoare_stmt retC ret lk_invs PC P s QC' Q.
+Proof.
+  intros.
+  eapply ht_consequence; eauto.
+Qed.
+
+Lemma ht_q_consequence : forall retC ret lk_invs PC P s QC Q Q',
+  Q |-- Q' ->
+  hoare_stmt retC ret lk_invs PC P s QC Q ->
+  hoare_stmt retC ret lk_invs PC P s QC Q'.
+Proof.
+  intros.
+  eapply ht_consequence; eauto.
+Qed.
+(*
+(* Need to have a hypothesis that nothing touches rv *)
+Lemma ht_call_nf : forall {retC ret},
+            forall {PC P QC Q rv rt pv s e val},
+            hoare_proc PC P (p_proc rt pv s) QC Q ->
+            hoare_stmt retC ret
+                       (fun rho => PC (eval_expr e rho))
+                       (fun rho => P (eval_expr e rho))
+                           (s_call rv (p_proc rt pv s) e)
+                       (fun rho => QC (eval_expr e rho) val)
+                       (fun rho => !!(table_get rho rv = Some val) &&
+                                   Q (eval_expr e rho) val).
 *)
+
+Definition example1 :=
+  p_proc t_nat (4,t_nat) ([{
+    s_return (e_read (4,t_nat)) ;
+    s_skip ;
+  }]).
+
+
+
+
+Lemma pre_false : forall rc r lk_invs s QC Q,
+  {{ rc }} {{ r }} {{ lk_invs }} ||-
+  {{ ETT }} {{ EFF }} s {{ QC }} {{ Q }}.
+Proof.
+  intros.
+  revert QC Q.
+  induction s; intros.
+  - apply ht_p_consequence with (P:=Q).
+    intro.
+    normalize.
+    apply ht_qc_consequence with (QC:=TT); normalize.
+    apply ht_skip.
+  - eapply ht_seq.
+    instantiate (1:=FF); instantiate (1:=TT); normalize.
+    apply IHs2.
+  - admit. (* s_start *)
+  - admit. (* s_assign *)
+  - admit. (* s_load *)
+  - admit. (* s_store *)
+  - apply ht_if.
+    apply ht_p_consequence with (P:=(fun _ => FF)).
+    intro. normalize.
+    trivial.
+    apply ht_p_consequence with (P:=(fun _ => FF)).
+    intro. normalize.
+    trivial.
+  - admit. (* s_while *)
+  - admit. (* s_call... shoot, how to handle induction on p? *)
+  - admit. (* s_return *)
+  - admit. (* s_getlock *)
+  - admit. (* s_putlock *)
 Admitted.
 
-Lemma example1_sound :
-  {{{ TT }}} {{{ TT }}} example1 
-    {{{ TT }}} {{{ fun a => fun r => !!(r = a)}}}.
+
+Lemma example1_sound : forall lk_invs,
+  {{{ lk_invs }}}
+  {{{ fun _ => emp }}} {{{ fun _ => emp }}} example1
+    {{{ fun _ => fun _ => emp }}} {{{ fun a => fun r => !!(r = a)}}}.
 Proof.
   unfold example1.
+  intro.
   apply ht_proc.
   intro.
-  apply ht_block with (RC:=FF) (R:=FF).
+  apply ht_seq with (RC:=ETT) (R:=EFF).
   apply ht_return; normalize.
   intros.
   unfold eval_expr.
@@ -297,6 +404,43 @@ Proof.
   normalize.
   apply pre_false.
 Qed.
+
+Definition example2 :=
+  p_proc t_nat (4,t_nat) ([{
+    s_call (5,t_nat) example1 (e_read (4,t_nat)) ;
+    s_return (e_read (5,t_nat)) ;
+  }]).
+
+Lemma example2_sound : forall lk_invs,
+  {{{ lk_invs }}}
+  {{{ fun _ => emp }}} {{{ fun _ => emp }}} example2 
+    {{{ fun _ => fun _ => emp }}} {{{ fun a => fun r => !!(r = a)}}}.
+Proof.
+  intro; unfold example2; apply ht_proc; intros.
+  eapply ht_seq.
+  pose proof example1_sound.
+  unfold example1 in *.
+  eapply (ht_call (H lk_invs)); normalize.
+
+  (* Shouldn't it know this was the arg? *)
+  instantiate (1:=a).
+  apply ht_return; normalize.
+  instantiate (1:=(fun _ => emp)).
+  intros; intro; intro; trivial.
+  intros.
+  instantiate (1:=(fun _ => emp)).
+  apply andp_right;
+  unfold eval_expr.
+  rewrite H.
+  apply tt_sound in H.
+  simpl in H.
+  eapply prop_right; eauto.
+  eapply prop_right.
+  unfold eval_expr.
+  rewrite H.
+  trivial.
+Qed.
+
 
 (*
 Inductive safe: (list command * state) -> Prop :=

@@ -21,26 +21,41 @@ Import Relations.
 
 Inductive type :=
 | t_nat
-| t_addr
 | t_bool
-| t_lock
+| t_lock : type -> type
 .
 
 Definition var := (nat * type)%type.
-Definition addr := (nat * type)%type.
-Definition disk_addr := (nat * type)%type.
 
-Instance EqDec_nattype : EqDec (nat *type) := _.
+(* nat gives the number of elements of type |type| *)
+Definition lock := (nat * bool * type)%type.
+
+Inductive value : Type :=
+| v_nat (n:nat)
+| v_bool (b:bool)
+| v_lock (l:lock)
+| v_undef
+.
+
+
+
+
+Instance EqDec_var : EqDec (var) := _.
 Proof.
 Admitted.
 
 
-Inductive value :=
-| v_nat (n:nat)
-| v_addr (a:addr)
-| v_bool (b:bool)
-| v_undef
+Instance EqDec_lock : EqDec (lock) := _.
+Proof.
+Admitted.
+
+Inductive invariant : Type :=
+(* Just an example *)
+| nat_inv : invariant
 .
+
+
+
 
 Definition table A B := list (A*B).
 
@@ -66,20 +81,7 @@ Qed.
 
 
 Definition env := table var value.
-Definition heap := table addr value.
-Definition disk := table disk_addr value.
-
-Inductive invariant : Type :=
-(* Just an example *)
-| nat_inv : invariant
-.
-
-(* locks are a special class of variables *)
-Inductive lock: Type :=
-| mklock : invariant -> lock
-.
-
-Definition state := (heap * disk)%type.
+Definition state := table lock value.
 
 (*
  * expressions produce values
@@ -94,7 +96,8 @@ Inductive expr: Type :=
  * statements don't
  *)
 Inductive stmt: Type :=
-| s_block: list stmt -> stmt
+| s_skip : stmt
+| s_seq: stmt -> stmt -> stmt
 | s_start: proc -> expr -> stmt
 | s_assign: var -> expr -> stmt
 | s_load: var -> lock -> stmt
@@ -102,7 +105,6 @@ Inductive stmt: Type :=
 | s_if: expr -> stmt -> stmt -> stmt
 | s_while: expr -> stmt -> stmt
 | s_call: var -> proc -> expr -> stmt
-| s_local: var -> expr -> stmt
 | s_return: expr -> stmt
 | s_getlock: lock -> stmt
 | s_putlock: lock -> stmt
@@ -115,17 +117,10 @@ with
 | p_proc: type -> var -> stmt -> proc
 .
 
-(*
+Notation "[{ s1 ; s2 ; }]" :=
+  (s_seq s1 s2) (at level 90, s1 at next level, s2 at next level, format
+"'[v' [{ '[  ' '//' s1 ; '//' s2 ; ']' '//' }] ']'").
 
-(*
- * Extended/sugary AST forms
- *)
-
-Definition coqcall {ta tr : Set} (f : ta -> tr) (x : ta): Expr tr :=
-   value tr (f x)
-.
-*)
-Definition skip: stmt := s_block nil.
 (*
 (*
  * well-formedness constraints

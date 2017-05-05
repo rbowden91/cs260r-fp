@@ -20,10 +20,10 @@ a bunch of stuff that was wrong used to live right here
 
 *)
 
-Inductive ExprHoare: forall t, Prop -> Expr t -> (t -> Prop) :=
+Inductive ExprHoare: forall t, Prop -> expr t -> (t -> Prop) :=
 | ExprTriple: forall t p s q, ExprHoare t p s q.
 
-Inductive StmtHoare: Prop -> Stmt -> Prop -> Prop :=
+Inductive StmtHoare: Prop -> stmt -> Prop -> Prop :=
 | StmtTriple: forall p s q, StmtHoare p s q.
 
 Inductive ProcHoare: forall (pt rt: Type),

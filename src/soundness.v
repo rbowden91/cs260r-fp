@@ -26,12 +26,12 @@ Definition localenv_sound_new (tyenv: VarMap Type) (env: Locals): Prop :=
       VarMapMapsTo (mkvar t id) t tyenv ->
       exists a, NatMap.MapsTo id (mkval t a) env.
 
-Definition localenv_sound (env: Locals) (prog : Stmt): Prop :=
+Definition localenv_sound (env: Locals) (prog : stmt): Prop :=
   forall t name,
     StmtVarRespectsT t name prog ->
     exists a, NatMap.find name env = Some (mkval t a).
 
-Lemma localenv_weaken (env: Locals) (prog: Stmt):
+Lemma localenv_weaken (env: Locals) (prog: stmt):
    forall (t : Set) name,
       localenv_sound env prog ->
       StmtVarRespectsT t name prog ->
@@ -46,7 +46,7 @@ Proof.
    discriminate.
 Qed.
 
-Lemma localenv_weaken2 (env: Locals) (prog: Stmt):
+Lemma localenv_weaken2 (env: Locals) (prog: stmt):
    forall (t : Set) name,
       localenv_sound env prog ->
       StmtVarRespectsT t name prog ->
@@ -63,7 +63,7 @@ Qed.
 
 
 (*
-Lemma localenv_weaken_new (env: Locals) (prog: Stmt):
+Lemma localenv_weaken_new (env: Locals) (prog: stmt):
    forall tyenv tyenv' name,
       localenv_sound_x env prog ->
       VarsScopedStmt tyenv prog tyenv' ->
@@ -78,7 +78,7 @@ Proof.
    discriminate.
 Qed.
 
-Lemma localenv_weaken2_new (env: Locals) (prog: Stmt):
+Lemma localenv_weaken2_new (env: Locals) (prog: stmt):
    forall tyenv tyenv' name,
       localenv_sound_x env prog ->
       VarsScopedStmt tyenv prog tyenv' ->

@@ -56,7 +56,7 @@ End Stores.
 
 Section Expressions.
 
-Inductive ExprYields: forall t, Locals -> Expr t -> t -> Prop :=
+Inductive ExprYields: forall t, Locals -> expr t -> t -> Prop :=
 | value_yields: forall loc t a, ExprYields t loc (value t a) a
 | read_yields: forall loc t (x : var t) id a,
     x = mkvar t id -> NatMap.find id loc = Some (mkval t a) ->
@@ -79,7 +79,7 @@ End Expressions.
 Section Statements.
 
 (* call, return, and start appear at higher levels *)
-Inductive StmtSteps: Heap -> Locals -> Stmt -> Heap -> Locals -> Stmt -> Prop :=
+Inductive StmtSteps: Heap -> Locals -> stmt -> Heap -> Locals -> stmt -> Prop :=
 | step_in_block: forall h loc s h' loc' s' more,
      StmtSteps h loc s h' loc' s' ->
      StmtSteps h loc (block (s :: more)) h' loc' (block (s' :: more))
@@ -144,7 +144,7 @@ End Stacks.
 Section Threads.
 
 Inductive Thread: Type :=
-| thread: Locals -> Stack -> Stmt -> Thread
+| thread: Locals -> Stack -> stmt -> Thread
 .
 
 Inductive ThreadSteps: Heap -> Thread -> Heap -> Thread -> Prop :=

@@ -38,7 +38,7 @@ Require Import varmap.
  *)
 
 (* scoping *)
-Inductive VarsScopedExpr: forall (t: Type), VarMap Type -> Expr t -> Prop :=
+Inductive VarsScopedExpr: forall (t: Type), VarMap Type -> expr t -> Prop :=
 | vars_scoped_value: forall (t: Type) env k,
      VarsScopedExpr t env (value t k)
 | vars_scoped_read: forall (t: Type) env id,
@@ -51,7 +51,7 @@ Inductive VarsScopedExpr: forall (t: Type), VarMap Type -> Expr t -> Prop :=
      VarsScopedExpr t env (cond t pred te fe)
 .
 
-Inductive VarsScopedStmt: VarMap Type -> Stmt -> VarMap Type -> Prop :=
+Inductive VarsScopedStmt: VarMap Type -> stmt -> VarMap Type -> Prop :=
 | vars_scoped_block_nil: forall env,
      VarsScopedStmt env (block []) env
 | vars_scoped_block_cons: forall env s env' ss env'',
@@ -115,7 +115,7 @@ with
  * make sure they refer only to variables that exist.
  *)
 
-Inductive VarsUniqueStmt: Stmt -> VarMap unit -> Prop :=
+Inductive VarsUniqueStmt: stmt -> VarMap unit -> Prop :=
 | vars_unique_block_nil:
      VarsUniqueStmt (block []) (VarMap_empty unit)
 | vars_unique_block_cons: forall s env ss env',
@@ -161,7 +161,7 @@ with
 
 (* check that procedure returns are ok *)
 
-Inductive StmtEndsInReturn: Stmt -> Type -> Prop :=
+Inductive StmtEndsInReturn: stmt -> Type -> Prop :=
 | block_ends_in_return: forall ss t e,
      StmtEndsInReturn (block (ss ++ [return_ t e])) t
 | if_ends_in_return: forall s1 s2 t e,
@@ -178,7 +178,7 @@ with
 
 
 (* variable gets read by an expression *)
-Inductive InExpr : forall t, var t -> Expr t -> Prop :=
+Inductive InExpr : forall t, var t -> expr t -> Prop :=
 | inexpr_read : forall t v,
     InExpr t v (read t v)
 | inexpr_cond : forall t v b e1 e2,
@@ -186,7 +186,7 @@ Inductive InExpr : forall t, var t -> Expr t -> Prop :=
 .
 
 (* variable gets used in a statement *)
-Inductive InStmt : forall t, var t -> Stmt -> Prop :=
+Inductive InStmt : forall t, var t -> stmt -> Prop :=
 | instmt_block_front : forall t v st sts,
     InStmt t v st -> InStmt t v (block (st :: sts))
 | instmt_block_cons : forall t v st sts,
@@ -231,7 +231,7 @@ Inductive InStmt : forall t, var t -> Stmt -> Prop :=
 (* Inductive InProc := . *)
 
 (* does this expression respect the usage of varname s to denote a type t? *)
-Inductive ExprVarRespectsT (t : Type) (s : varidtype) : forall t', Expr t' -> Prop :=
+Inductive ExprVarRespectsT (t : Type) (s : varidtype) : forall t', expr t' -> Prop :=
 | evrt_value : forall t' exp,
     ExprVarRespectsT t s t' (value t' exp)
 | evrt_read_eq : (* expr type had better be the same *)
@@ -245,7 +245,7 @@ Inductive ExprVarRespectsT (t : Type) (s : varidtype) : forall t', Expr t' -> Pr
 
 (* does this statement respect the usage of varname s to denote a type t? *)
 (* XXX note that in both of these, non-usage counts as respectful! *)
-Inductive StmtVarRespectsT (t : Type) (s : varidtype) : Stmt -> Prop :=
+Inductive StmtVarRespectsT (t : Type) (s : varidtype) : stmt -> Prop :=
 | svrt_block_nil : StmtVarRespectsT t s (block [])
 | svrt_block_cons : forall st sts,
     StmtVarRespectsT t s st -> StmtVarRespectsT t s (block sts) ->

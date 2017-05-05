@@ -47,7 +47,7 @@ Section Stores.
 Inductive val: Type := mkval (t: Type) (a : t): val.
 
 Definition Heap := NatMap.t val.
-Definition Locals := StringMap.t val.
+Definition Locals := NatMap.t val.
 
 End Stores.
 
@@ -59,7 +59,7 @@ Section Expressions.
 Inductive ExprYields: forall t, Locals -> Expr t -> t -> Prop :=
 | value_yields: forall loc t a, ExprYields t loc (value t a) a
 | read_yields: forall loc t (x : Var t) id a,
-    x = var t id -> StringMap.find id loc = Some (mkval t a) ->
+    x = var t id -> NatMap.find id loc = Some (mkval t a) ->
     ExprYields t loc (read t x) a
 | cond_true_yields: forall t loc e et ef a,
     ExprYields bool loc e true ->
@@ -79,7 +79,6 @@ End Expressions.
 Section Statements.
 
 (* call, return, and start appear at higher levels *)
-Check StringMap.add.
 Inductive StmtSteps: Heap -> Locals -> Stmt -> Heap -> Locals -> Stmt -> Prop :=
 | step_in_block: forall h loc s h' loc' s' more,
      StmtSteps h loc s h' loc' s' ->
@@ -88,11 +87,11 @@ Inductive StmtSteps: Heap -> Locals -> Stmt -> Heap -> Locals -> Stmt -> Prop :=
      StmtSteps h loc (block (skip :: more)) h loc (block more)
 | step_assign: forall h loc id type e a,
      ExprYields type loc e a ->
-     StmtSteps h loc (assign type (var type id) e) h (StringMap.add id (mkval type a) loc) skip
+     StmtSteps h loc (assign type (var type id) e) h (NatMap.add id (mkval type a) loc) skip
 | step_load: forall h loc id type inv lk addr a,
      lk = lock type inv -> addr_from_lock type lk = addr -> (* XXX *)
      NatMap.find addr h = Some (mkval type a) ->
-     StmtSteps h loc (load type (var type id) lk) h (StringMap.add id (mkval type a) loc) skip
+     StmtSteps h loc (load type (var type id) lk) h (NatMap.add id (mkval type a) loc) skip
 | step_store: forall h loc type inv lk addr e a,
      lk = lock type inv -> addr_from_lock type lk = addr -> (* XXX *)
      ExprYields type loc e a ->
@@ -116,9 +115,9 @@ Inductive StmtSteps: Heap -> Locals -> Stmt -> Heap -> Locals -> Stmt -> Prop :=
      ExprYields bool loc e false ->
      StmtSteps h loc (while e body) h loc skip
 | step_local: forall h loc id type e a,
-     StringMap.find id loc = None ->
+     NatMap.find id loc = None ->
      ExprYields type loc e a ->
-     StmtSteps h loc (local type (var type id) e) h (StringMap.add id (mkval type a) loc) skip
+     StmtSteps h loc (local type (var type id) e) h (NatMap.add id (mkval type a) loc) skip
 (* XXX
 | step_getlock: ?
 | step_putlock: ?
@@ -163,7 +162,7 @@ Inductive ThreadSteps: Heap -> Thread -> Heap -> Thread -> Prop :=
 				arg)
 		 )
 		 h (thread
-			(StringMap.add paramid (mkval pt argval) (StringMap.empty val))
+			(NatMap.add paramid (mkval pt argval) (NatMap.empty val))
 			(stack_pending rt loc (var rt retid) stk)
 			body
 		 )
@@ -180,7 +179,7 @@ Inductive ThreadStepsStart: Thread -> Thread -> Thread -> Prop :=
      ThreadStepsStart
 	(thread loc stk (start pt (proc pt unit (var pt paramid) body) arg))
         (thread loc stk skip)
-	(thread (StringMap.add paramid (mkval pt argval) (StringMap.empty val)) stack_empty body)
+	(thread (NatMap.add paramid (mkval pt argval) (NatMap.empty val)) stack_empty body)
 .
 
 End Threads.

@@ -24,18 +24,18 @@ Require Import semantics.
 Definition localenv_sound_new (tyenv: VarMap Type) (env: Locals): Prop :=
    forall t id,
       VarMapMapsTo (var t id) t tyenv ->
-      exists a, StringMap.MapsTo id (mkval t a) env.
+      exists a, NatMap.MapsTo id (mkval t a) env.
 
 Definition localenv_sound (env: Locals) (prog : Stmt): Prop :=
   forall t name,
     StmtVarRespectsT t name prog ->
-    exists a, StringMap.find name env = Some (mkval t a).
+    exists a, NatMap.find name env = Some (mkval t a).
 
 Lemma localenv_weaken (env: Locals) (prog: Stmt):
    forall (t : Set) name,
       localenv_sound env prog ->
       StmtVarRespectsT t name prog ->
-      StringMap.find name env = None -> False.
+      NatMap.find name env = None -> False.
 Proof.
    intros.
    unfold localenv_sound in H.
@@ -50,7 +50,7 @@ Lemma localenv_weaken2 (env: Locals) (prog: Stmt):
    forall (t : Set) name,
       localenv_sound env prog ->
       StmtVarRespectsT t name prog ->
-      (forall t' a, StringMap.find name env = Some (mkval t' a) -> t' = t).
+      (forall t' a, NatMap.find name env = Some (mkval t' a) -> t' = t).
 Proof.
    intros.
    unfold localenv_sound in H.
@@ -67,7 +67,7 @@ Lemma localenv_weaken_new (env: Locals) (prog: Stmt):
    forall tyenv tyenv' name,
       localenv_sound_x env prog ->
       VarsScopedStmt tyenv prog tyenv' ->
-      StringMap.find name env = None -> False.
+      NatMap.find name env = None -> False.
 Proof.
    intros.
    unfold localenv_sound_x in H.
@@ -82,7 +82,7 @@ Lemma localenv_weaken2_new (env: Locals) (prog: Stmt):
    forall tyenv tyenv' name,
       localenv_sound_x env prog ->
       VarsScopedStmt tyenv prog tyenv' ->
-      (forall t' a, StringMap.find name env = Some (mkval t' a) -> t' = t).
+      (forall t' a, NatMap.find name env = Some (mkval t' a) -> t' = t).
 Proof.
    intros.
    unfold localenv_sound in H.
@@ -147,8 +147,8 @@ Proof.
       specialize (H0 t name).
       inversion H0; subst.
       * exists a.
-        rewrite StringMapFacts.add_eq_o; auto.
-      * rewrite StringMapFacts.add_neq_o; auto.
+        rewrite NatMapFacts.add_eq_o; auto.
+      * rewrite NatMapFacts.add_neq_o; auto.
     + intros; constructor.
   - split.
     + unfold localenv_sound in *.
@@ -156,8 +156,8 @@ Proof.
       specialize (H0 t name).
       inversion H0; subst.
       * exists a.
-        rewrite StringMapFacts.add_eq_o; auto.
-      * rewrite StringMapFacts.add_neq_o; auto.
+        rewrite NatMapFacts.add_eq_o; auto.
+      * rewrite NatMapFacts.add_neq_o; auto.
     + intros; constructor.
   - split.
     + unfold localenv_sound in *.
@@ -231,61 +231,61 @@ Lemma localenv_sound_addition:
    ~(VarMapIn (var t id) tyenv) ->
    localenv_sound_new
         (VarMap_add (var t id) t tyenv)
-        (StringMap.add id (mkval t a) loc).
+        (NatMap.add id (mkval t a) loc).
 Proof.
    unfold localenv_sound_new.
    intros.
-   destruct (string_dec id0 id).
+   destruct (Nat.eq_dec id0 id).
    - subst.
      assert (t0 = t) by
         (unfold VarMapMapsTo in *;
          unfold VarMap_add in *;
          unfold var_id in *;
-         rewrite varmap.StringMapFacts.add_mapsto_iff in H1;
+         rewrite varmap.NatMapFacts.add_mapsto_iff in H1;
          destruct H1 as [H1 | H1]; destruct H1;
          try contradiction; auto).
      subst.
      exists a.
-     apply StringMap.add_1.
+     apply NatMap.add_1.
      auto.
    - unfold VarMapMapsTo in *.
      unfold VarMap_add in *.
      unfold var_id in *.
-     rewrite varmap.StringMapFacts.add_neq_mapsto_iff in H1; auto.
+     rewrite varmap.NatMapFacts.add_neq_mapsto_iff in H1; auto.
      apply H in H1.
      destruct H1 as [a0 H1].
      exists a0.
-     apply StringMap.add_2; auto.
+     apply NatMap.add_2; auto.
 Qed.
 
 Lemma localenv_sound_replacement:
    forall tyenv loc t id a,
    localenv_sound_new tyenv loc ->
    VarMapMapsTo (var t id) t tyenv ->
-   localenv_sound_new tyenv (StringMap.add id (mkval t a) loc).
+   localenv_sound_new tyenv (NatMap.add id (mkval t a) loc).
 Proof.
    unfold localenv_sound_new.
    intros.
-   destruct (string_dec id0 id).
+   destruct (Nat.eq_dec id0 id).
    - subst.
      assert (t0 = t) by
         (unfold VarMapMapsTo in *;
         unfold var_id in *;
         unfold VarMap in tyenv;
-        apply varmap.StringMapFacts.MapsTo_fun with (m := tyenv) (x := id);
+        apply varmap.NatMapFacts.MapsTo_fun with (m := tyenv) (x := id);
         auto).
      subst.
      specialize H with (t := t) (id := id).
      apply H in H0.
      destruct H0 as [a0 H0].
      exists a.
-     apply StringMap.add_1.
+     apply NatMap.add_1.
      auto.
    - specialize H with (t := t0) (id := id0).
      apply H in H1.
      destruct H1 as [a0 H1].
      exists a0.
-     apply StringMap.add_2; auto.
+     apply NatMap.add_2; auto.
 Qed.
 
 Lemma StmtStepsPreserves_new :
@@ -435,7 +435,7 @@ Proof.
      destruct H4 as [a H4].
      exists a.
      apply read_yields with (id := id); auto.
-     apply StringMap.find_1.
+     apply NatMap.find_1.
      auto.
    - (* this is problematic *)
      admit.
@@ -463,8 +463,8 @@ Proof.
     destruct H10 as [a H10].
     remember v as v1.
     destruct v1.
-    exists h, (StringMap.add s (mkval t a) l), skip.
-    apply step_assign with (h := h) (loc := l) (id := s) (type := t) (e := e) (a := a).
+    exists h, (NatMap.add n (mkval t a) l), skip.
+    apply step_assign with (h := h) (loc := l) (id := n) (type := t) (e := e) (a := a).
     assert (e1 = e) by admit.
     subst; auto.
   - (* TBD *)

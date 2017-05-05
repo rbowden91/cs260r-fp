@@ -32,6 +32,9 @@ Definition var_id {t} (x: Var t) :=
    | var _ id => id
    end.
 
+Definition varidtype := nat.
+
+(*
 Module StringMap := FMapList.Make String_as_OT.
 Module StringMapFacts := FMapFacts.WFacts_fun String_as_OT StringMap.
 Module StringMapProperties := FMapFacts.WProperties_fun String_as_OT StringMap.
@@ -56,14 +59,30 @@ Definition VarMapIn {t} {t2} (k: Var t) (m: StringMap.t t2) :=
    StringMap.In (var_id k) m.
 Definition VarMapMapsTo {t} {t2} (k: Var t) (v: t2) (m: StringMap.t t2) :=
    StringMap.MapsTo (var_id k) v m.
+*)
 
-(*
 Module NatMap := FMapList.Make Nat_as_OT.
 Module NatMapFacts := FMapFacts.WFacts_fun Nat_as_OT NatMap.
+Module NatMapProperties := FMapFacts.WProperties_fun Nat_as_OT NatMap.
+
+Definition NatMap_union {t} (m1 m2: NatMap.t t) :=
+   NatMap.fold (@NatMap.add t) m2
+      (NatMap.fold (@NatMap.add t) m1 (@NatMap.empty t)).
+
+Lemma NatMap_union_correct:
+   forall t (k: nat) (m1 m2: NatMap.t t),
+   (NatMap.In k m1 \/ NatMap.In k m2) <->
+      NatMap.In k (NatMap_union m1 m2).
+Proof.
+Admitted.
 
 Definition VarMap := NatMap.t.
 Definition VarMap_empty := NatMap.empty.
-Definition VarMap_add k v m := NatMap.add (var_id k) v m.
-Definition VarMap_union m1 m2 := NatMap.union m1 m2.
-Definition VarMapIn k m := NatMap.In (var_id k) m.
-*)
+Definition VarMap_add {t} {t2} (k: Var t) (v: t2) m :=
+   NatMap.add (var_id k) v m.
+Definition VarMap_union {t} m1 m2 := @NatMap_union t m1 m2.
+Definition VarMapDisjoint := NatMapProperties.Disjoint.
+Definition VarMapIn {t} {t2} (k: Var t) (m: NatMap.t t2) :=
+   NatMap.In (var_id k) m.
+Definition VarMapMapsTo {t} {t2} (k: Var t) (v: t2) (m: NatMap.t t2) :=
+   NatMap.MapsTo (var_id k) v m.

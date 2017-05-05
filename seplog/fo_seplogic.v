@@ -93,17 +93,44 @@ Function eval_expr (e : expr) (env : env) : value :=
   end
 .
 
+Function typeof_val (v : value) (t : type) : Prop :=
+  match v with
+  | v_nat _ => t_nat = t
+  | v_bool _ => t_bool = t
+  | v_addr _ => t_addr = t
+  | v_undef => False
+  end.
+
+Function typeof_expr (e : expr) (rho : env) (t : type) : Prop :=
+  match e with
+  | e_read v => match table_get rho v with
+                | None => False
+                | Some _ => snd v = t
+                end
+  | e_value v => typeof_val v t
+  | e_cond eb e1 e2 =>
+    typeof_expr eb rho t_bool /\
+    typeof_expr e1 rho t /\
+    typeof_expr e2 rho t
+  end.
+
 Definition lift0 {B} (P: B) : env -> B := fun _ => P.
 Definition lift1 {A1 B} (P: A1 -> B) (f1: env -> A1) : env -> B := fun rho => P (f1 rho).
 Definition lift2 {A1 A2 B} (P: A1 -> A2 -> B) (f1: env -> A1) (f2: env -> A2):
    env -> B := fun rho => P (f1 rho) (f2 rho).
 
 (*Definition local: (world -> Prop) -> world -> pred world :=  lift1 prop.*)
-
 Local Open Scope logic.
+Definition assign_forward (v : var) (e : expr) (P : assertion) (rho : env) := 
+  EX old:value,
+    (!!(table_get rho v = Some (eval_expr e (table_set v old rho)))
+    && P (table_set v old rho)).
+
+
+
 Inductive hoare_stmt :
-  (value -> assertion) -> (* retC *)
-  (value -> assertion) -> (* ret *)
+  (value -> pred world) -> (* retC *)
+  (value -> pred world) -> (* ret *)
   (*(lock_type -> addr -> (s_prop * s_prop)) -> *)
   assertion -> assertion -> stmt -> assertion -> assertion -> Prop :=
 
@@ -126,34 +153,24 @@ Inductive hoare_stmt :
           hoare_stmt retC ret
                      PC (fun rho => P rho && !!((eq (v_bool true) (eval_expr e_b rho)))) s1 QC Q ->
           hoare_stmt retC ret
-                     PC (fun rho => P rho && !!((eq (v_bool true) (eval_expr e_b rho)))) s2 QC Q ->
+                     PC (fun rho => P rho && !!((eq (v_bool false) (eval_expr e_b rho)))) s2 QC Q ->
           hoare_stmt retC ret
                      PC P (s_if e_b s1 s2) QC Q
 
-| ht_consequence : forall retC ret,
-                   forall PC PC' QC P P' Q Q' s,
-                   hoare_stmt retC ret
-                              PC P s QC Q ->
-                   (forall rho, PC' rho |-- PC rho) ->
-                   (forall rho, P' rho |-- P rho) ->
-                   (forall rho, Q rho |-- Q' rho) ->
-                   hoare_stmt retC ret
-                              PC' P' s QC Q'
-
-| ht_frame : forall retC ret,
-             forall PC QC P Q R s,
-             hoare_stmt retC ret
-                        PC P s QC Q ->
-             hoare_stmt retC ret
-                        PC (fun rho => (P rho) * (R rho)) s QC (fun rho => (Q rho) * (R rho))
-
-| ht_return : forall (retC : value -> assertion) (ret : value -> assertion),
+| ht_return : forall retC ret,
               forall e PC P,
-              (forall rho, PC rho |-- retC (eval_expr e rho) rho) ->
-              (forall rho, P rho |-- ret (eval_expr e rho) rho) ->
+              (forall rho, PC rho |-- retC (eval_expr e rho)) ->
+              (forall rho, P rho |-- ret (eval_expr e rho)) ->
               hoare_stmt retC ret
                          PC P (s_return e) FF FF
-
+(*
+| ht_return : forall retC ret,
+              forall e,
+              hoare_stmt retC ret
+                         (fun rho => retC (eval_expr e rho)) 
+                         (fun rho => ret (eval_expr e rho)) 
+                         (s_return e) FF FF
+*)
 | ht_while : forall retC ret,
              forall C P e_b s,
              hoare_stmt retC ret
@@ -164,21 +181,79 @@ Inductive hoare_stmt :
 | ht_assign : forall retC ret,
               forall C P v e,
               hoare_stmt retC ret
-                         C P (s_assign v e)
-                           (fun (rho:env) => EX old:value,
-                  (* QC *)   (!!(table_get rho v = Some (eval_expr e (table_set v old rho)))
-                              && C (table_set v old rho)))
-                           (fun (rho:env) => EX old:value,
-                   (* Q *)   (!!(table_get rho v = Some (eval_expr e (table_set v old rho)))
-                              && P (table_set v old rho)))
+                           C
+                           (fun rho => P rho && !!(typeof_expr e rho (snd v)))
+                             (s_assign v e)
+                           (assign_forward v e C)
+                           (assign_forward v e P)
 
+(* XXX special frame for PC and QC. Also, this seems to weakly constrain the old rv... *)
+| ht_call : forall retC ret,
+            forall F PC P QC Q rv rt pv s e val,
+            hoare_proc PC P (p_proc rt pv s) QC Q ->
+            hoare_stmt retC ret
+                       (fun rho => PC (eval_expr e rho))
+                       (fun rho => F rho * P (eval_expr e rho))
+                           (s_call rv (p_proc rt pv s) e)
+                       (fun rho => EX old:value,
+                                       ((*F (table_set rv old rho) **)
+                                       QC (eval_expr e (table_set rv old rho)) val))
+                       (fun rho => !!(table_get rho rv = Some val) &&
+                                   EX old:value,
+                                       (F (table_set rv old rho) *
+                                       Q (eval_expr e (table_set rv old rho)) val))
+
+(* Stmt rules not directly related to the language *)
+| ht_consequence : forall retC ret,
+                   forall PC PC' QC QC' P P' Q Q' s,
+                   hoare_stmt retC ret
+                              PC P s QC Q ->
+(* XXX  want these? *)
+                   (forall rho, PC rho |-- PC' rho) -> 
+                   (forall rho, QC' rho |-- QC rho) -> 
+                   (forall rho, P' rho |-- P rho) ->
+                   (forall rho, Q rho |-- Q' rho) ->
+                   hoare_stmt retC ret
+                              PC' P' s QC' Q'
+
+(* XXX something about modified vars in R? *)
+| ht_frame : forall retC ret,
+             forall PC QC P Q R s,
+             hoare_stmt retC ret
+                        PC P s QC Q ->
+             hoare_stmt retC ret
+                        PC (fun rho => (P rho) * (R rho)) s QC (fun rho => (Q rho) * (R rho))
+
+(*
+| ht_frame_crash : forall retC ret,
+                   forall PC QC P Q R s,
+                   hoare_stmt retC ret
+                              PC P s QC Q ->
+                   hoare_stmt retC ret
+                              (fun rho => (PC rho) * (R rho))
+                              (fun rho => (P rho) * (R rho) * l) 
+                                  s 
+                              (fun rho => (QC rho) * (R rho))
+                              (fun rho => (Q rho) * (R rho) * l)
+*)
+
+(* XXX semax_extract_prop? *)
+
+(* These *don't* take assertions, because (for now) they don't need to take
+ * the environment (argument / return value are explicitly passed in) *)
 with hoare_proc :
-  (value -> assertion) -> (value -> assertion) -> proc -> 
-  (value -> value -> assertion) -> (value -> value -> assertion) -> Prop :=
-| ht_proc : forall PC QC P Q v s,
-               (forall a, hoare_stmt (QC a) (Q a) (PC a) (fun s => !!(table_get s v = Some a) && (P a s)) s FF FF) ->
-               hoare_proc PC P (p_proc v s) QC Q.
-
+  (value -> pred world) -> (value -> pred world) -> proc -> 
+  (value -> value -> pred world) -> (value -> value -> pred world) -> Prop :=
+| ht_proc : forall PC QC P Q t v s,
+               (forall a, hoare_stmt (QC a) 
+                                     (fun r => !!(typeof_val r t) && Q a r)
+                                     (fun rho => PC a)
+                                     (fun rho => !!(typeof_val a (snd v)) && 
+                                                 !!(table_get rho v = Some a) && P a)
+                                     s
+                                     FF
+                                     FF) ->
+               hoare_proc PC P (p_proc t v s) QC Q.
 
 Notation "{{ retC }} {{ ret }} ||- {{ PC }} {{ P }} c {{ QC }} {{ Q }}" :=
   (hoare_stmt retC ret PC P c QC Q) (at level 90, c at next level).
@@ -188,8 +263,8 @@ Notation "{{{ PC }}} {{{ P }}} p {{{ QC }}} {{{ Q }}}" :=
 
 
 Definition example1 :=
-  p_proc (4) (s_block [
-    s_return (e_read (4))
+  p_proc t_nat (4,t_nat) (s_block [
+    s_return (e_read (4,t_nat))
   ]).
 
 Lemma pre_false : forall rc r s QC Q,
@@ -208,8 +283,8 @@ Proof.
 Admitted.
 
 Lemma example1_sound :
-  {{{ fun _ => lift0 emp }}} {{{ fun _ => lift0 emp }}} example1 
-    {{{ fun _ => fun _ => lift0 emp }}} {{{ fun a => fun r => !!(r = a)}}}.
+  {{{ TT }}} {{{ TT }}} example1 
+    {{{ TT }}} {{{ fun a => fun r => !!(r = a)}}}.
 Proof.
   unfold example1.
   apply ht_proc.
@@ -218,15 +293,8 @@ Proof.
   apply ht_return; normalize.
   intros.
   unfold eval_expr.
-  rewrite H.
+  rewrite H0.
   normalize.
-  (* XXX is this hard because of the environment?? *)
-  unfold TT.
-  unfold lift0.
-  unfold prop.
-  simpl.
-  normalize.
-
   apply pre_false.
 Qed.
 

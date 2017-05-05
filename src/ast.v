@@ -21,14 +21,14 @@ Definition s_prop := nat.
 
 Definition addr := nat.
 
-Inductive Invariant : Set -> Type :=
+Inductive invariant : Type :=
 (* Just an example *)
-| nat_inv : (s_prop * s_prop) -> Invariant nat
+| nat_inv : invariant
 .
 
 (* locks are a special class of variables *)
 Inductive lock: Type -> Type :=
-| mklock : forall t, Invariant t -> lock t
+| mklock : forall t, invariant -> lock t
 .
 
 (* variables are identified with numbers *)

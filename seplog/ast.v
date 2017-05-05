@@ -19,9 +19,21 @@ Import Relations.
  * abstract syntax the code is written in
  *)
 
-Definition var := nat.
-Definition addr := nat.
-Definition disk_addr := nat.
+Inductive type :=
+| t_nat
+| t_addr
+| t_bool
+| t_lock
+.
+
+Definition var := (nat * type)%type.
+Definition addr := (nat * type)%type.
+Definition disk_addr := (nat * type)%type.
+
+Instance EqDec_nattype : EqDec (nat *type) := _.
+Proof.
+Admitted.
+
 
 Inductive value :=
 | v_nat (n:nat)
@@ -30,34 +42,32 @@ Inductive value :=
 | v_undef
 .
 
+Definition table A B := list (A*B).
 
-Definition table (A : Type) := list (A*value).
-
-Fixpoint table_get {A}{H: EqDec A} (rho: table A) (x: A) : option value :=
+Fixpoint table_get {A B}{H: EqDec A} (rho: table A B) (x: A) : option B :=
   match rho with
   | (y,v)::ys => if eq_dec x y then Some v else table_get ys x
   | nil => None
  end.
 
-Definition table_set {A}{H: EqDec A} (x: A) (v: value) (rho: table A)  : table A := (x,v)::rho.
+Definition table_set {A B}{H: EqDec A} (x: A) (v: B) (rho: table A B) : table A B := (x,v)::rho.
 
-Lemma table_gss {A}{H: EqDec A}: forall rho x v, table_get (table_set x v rho) x = Some v.
+Lemma table_gss {A B}{H: EqDec A}: forall rho x (v : B), table_get (table_set x v rho) x = Some v.
 Proof.
 intros.
 simpl. destruct (eq_dec x x); auto. contradiction n; auto.
 Qed.
 
-Lemma table_gso {A}{H: EqDec A}: forall rho x y v, x<>y -> table_get (table_set x v rho) y = table_get rho y.
+Lemma table_gso {A B}{H: EqDec A}: forall rho x y (v : B), x<>y -> table_get (table_set x v rho) y = table_get rho y.
 Proof.
 intros.
 simpl. destruct (eq_dec y x); auto.  contradiction H0; auto.
 Qed.
 
 
-Definition env := table var.
-Definition heap := table addr.
-Definition disk := table disk_addr.
-
+Definition env := table var value.
+Definition heap := table addr value.
+Definition disk := table disk_addr value.
 
 Inductive invariant : Type :=
 (* Just an example *)
@@ -102,7 +112,7 @@ with
  * procs both take and produce values
  *)
 (*Inductive*) proc: Type :=
-| p_proc: var -> stmt -> proc
+| p_proc: type -> var -> stmt -> proc
 .
 
 (*

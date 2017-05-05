@@ -76,9 +76,9 @@ with
  * Extended/sugary AST forms
  *)
 
-Definition coqcall {ta tr : Set} (f : ta -> tr) (x : ta): expr tr :=
+Definition e_coqcall {ta tr : Set} (f : ta -> tr) (x : ta): expr tr :=
    e_value tr (f x)
 .
 
-Definition skip: stmt := s_block nil.
+Definition s_skip: stmt := s_block nil.
 

@@ -85,23 +85,23 @@ Inductive StmtSteps: Heap -> Locals -> stmt -> Heap -> Locals -> stmt -> Prop :=
      StmtSteps h loc s h' loc' s' ->
      StmtSteps h loc (s_block (s :: more)) h' loc' (s_block (s' :: more))
 | step_next: forall h loc more,
-     StmtSteps h loc (s_block (skip :: more)) h loc (s_block more)
+     StmtSteps h loc (s_block (s_skip :: more)) h loc (s_block more)
 | step_assign: forall h loc id type e a,
      ExprYields type loc e a ->
-     StmtSteps h loc (s_assign type (mkvar type id) e) h (NatMap.add id (mkval type a) loc) skip
+     StmtSteps h loc (s_assign type (mkvar type id) e) h (NatMap.add id (mkval type a) loc) s_skip
 | step_load: forall h loc id type inv lk addr a,
      lk = mklock type inv -> addr_from_lock type lk = addr -> (* XXX *)
      NatMap.find addr h = Some (mkval type a) ->
-     StmtSteps h loc (s_load type (mkvar type id) lk) h (NatMap.add id (mkval type a) loc) skip
+     StmtSteps h loc (s_load type (mkvar type id) lk) h (NatMap.add id (mkval type a) loc) s_skip
 | step_store: forall h loc type inv lk addr e a,
      lk = mklock type inv -> addr_from_lock type lk = addr -> (* XXX *)
      ExprYields type loc e a ->
-     StmtSteps h loc (s_store type lk e) (NatMap.add addr (mkval type a) h) loc skip
+     StmtSteps h loc (s_store type lk e) (NatMap.add addr (mkval type a) h) loc s_skip
 | step_scope: forall h loc s h' loc' s',
      StmtSteps h loc s h' loc' s' ->
      StmtSteps h loc (s_scope s) h' loc' (s_scope s')
 | step_endscope: forall h loc,
-     StmtSteps h loc (s_scope skip) h loc skip
+     StmtSteps h loc (s_scope s_skip) h loc s_skip
 | step_if_true: forall h loc e st sf,
      ExprYields bool loc e true ->
      StmtSteps h loc (s_if e st sf) h loc (s_scope st)
@@ -114,11 +114,11 @@ Inductive StmtSteps: Heap -> Locals -> stmt -> Heap -> Locals -> stmt -> Prop :=
                h loc (s_block [s_scope body; s_while e body])
 | step_while_false: forall h loc e body,
      ExprYields bool loc e false ->
-     StmtSteps h loc (s_while e body) h loc skip
+     StmtSteps h loc (s_while e body) h loc s_skip
 | step_local: forall h loc id type e a,
      NatMap.find id loc = None ->
      ExprYields type loc e a ->
-     StmtSteps h loc (s_local type (mkvar type id) e) h (NatMap.add id (mkval type a) loc) skip
+     StmtSteps h loc (s_local type (mkvar type id) e) h (NatMap.add id (mkval type a) loc) s_skip
 (* XXX
 | step_getlock: ?
 | step_putlock: ?
@@ -179,7 +179,7 @@ Inductive ThreadStepsStart: Thread -> Thread -> Thread -> Prop :=
      ExprYields pt loc arg argval ->
      ThreadStepsStart
 	(thread loc stk (s_start pt (mkproc pt unit (mkvar pt paramid) body) arg))
-        (thread loc stk skip)
+        (thread loc stk s_skip)
 	(thread (NatMap.add paramid (mkval pt argval) (NatMap.empty val)) stack_empty body)
 .
 

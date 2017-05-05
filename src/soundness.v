@@ -215,7 +215,7 @@ Lemma StmtStepsProgress :
   forall h l s,
     localenv_sound l s ->
     (forall t name, StmtVarRespectsT t name s) ->
-    s <> skip ->
+    s <> s_skip ->
     exists h' l' s',
       StmtSteps h l s h' l' s'.
 Proof.
@@ -445,7 +445,7 @@ Lemma StmtStepsProgress_new:
   forall tyenv tyenv2 h l s,
     VarsScopedStmt tyenv s tyenv2 ->
     localenv_sound_new tyenv l ->
-    s <> skip ->
+    s <> s_skip ->
     (forall t p arg, s = s_start t p arg -> False) ->
     (forall pt rt x p e, s = s_call pt rt x p e -> False) ->
     (forall rt e, s = s_return rt e -> False) ->
@@ -455,7 +455,7 @@ Proof.
   intros tyenv tyenv2 h l s; revert tyenv tyenv2 h l.
   induction s; intros.
   - destruct l.
-    * unfold skip; contradiction.
+    * unfold s_skip; contradiction.
     * admit.
   - specialize (H2 pt p e). contradiction.
   - inversion H; subst.
@@ -463,7 +463,7 @@ Proof.
     destruct H10 as [a H10].
     remember v as v1.
     destruct v1.
-    exists h, (NatMap.add n (mkval t a) l), skip.
+    exists h, (NatMap.add n (mkval t a) l), s_skip.
     apply step_assign with (h := h) (loc := l) (id := n) (type := t) (e := e) (a := a).
     assert (e1 = e) by admit.
     subst; auto.

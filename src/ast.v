@@ -83,7 +83,8 @@ Inductive expr: Type :=
  * statements don't
  *)
 Inductive stmt: Type :=
-| s_block: list stmt -> stmt
+| s_skip: stmt
+| s_seq: stmt -> stmt -> stmt
 | s_start: proc -> expr -> stmt
 | s_assign: var -> expr -> stmt
 | s_load: var -> expr -> stmt
@@ -119,5 +120,6 @@ Definition e_coqcall {ta tr : type} (f : ta -> tr) (x : ta): expr tr :=
 .
 *)
 
+(* no longer relevant
 Definition s_skip: stmt := s_block nil.
-
+*)

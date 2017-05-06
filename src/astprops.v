@@ -53,12 +53,12 @@ Inductive VarsScopedExpr: forall (t: type), VarMap type -> expr -> Prop :=
 .
 
 Inductive VarsScopedStmt: VarMap type -> stmt -> VarMap type -> Prop :=
-| vars_scoped_block_nil: forall env,
-     VarsScopedStmt env (s_block []) env
-| vars_scoped_block_cons: forall env s env' ss env'',
-     VarsScopedStmt env s env' ->
-     VarsScopedStmt env' (s_block ss) env'' ->
-     VarsScopedStmt env (s_block (s :: ss)) env''
+| vars_scoped_skip: forall env,
+     VarsScopedStmt env s_skip env
+| vars_scoped_seq: forall env s1 env' s2 env'',
+     VarsScopedStmt env s1 env' ->
+     VarsScopedStmt env' s2 env'' ->
+     VarsScopedStmt env (s_seq s1 s2) env''
 | vars_scoped_start: forall env pt p e,
      VarsScopedProc pt t_unit p ->
      VarsScopedExpr pt env e ->
@@ -110,6 +110,11 @@ with
      VarsScopedProc pt rt (mkproc rt (mkvar pt id) body)
 .
 
+(* XXX clear these out later *)
+Definition vars_scoped_block_nil := vars_scoped_skip.
+Definition vars_scoped_block_cons := vars_scoped_seq.
+
+
 (* uniqueness *)
 
 (*
@@ -119,13 +124,13 @@ with
  *)
 
 Inductive VarsUniqueStmt: stmt -> VarMap unit -> Prop :=
-| vars_unique_block_nil:
-     VarsUniqueStmt (s_block []) (VarMap_empty unit)
-| vars_unique_block_cons: forall s env ss env',
-     VarsUniqueStmt s env ->
-     VarsUniqueStmt (s_block ss) env' ->
+| vars_unique_skip:
+     VarsUniqueStmt s_skip (VarMap_empty unit)
+| vars_unique_seq: forall s1 env s2 env',
+     VarsUniqueStmt s1 env ->
+     VarsUniqueStmt s2 env' ->
      VarMapDisjoint unit env env' ->
-     VarsUniqueStmt (s_block (s :: ss)) (VarMap_union env env')
+     VarsUniqueStmt (s_seq s1 s2) (VarMap_union env env')
 | vars_unique_start: forall p e,
      VarsUniqueStmt (s_start p e) (VarMap_empty unit)
 | vars_unique_assign: forall x e,
@@ -165,8 +170,8 @@ with
 (* check that procedure returns are ok *)
 
 Inductive StmtEndsInReturn: stmt -> type -> Prop :=
-| block_ends_in_return: forall ss t e,
-     StmtEndsInReturn (s_block (ss ++ [s_return e])) t
+| block_ends_in_return: forall s t e,
+     StmtEndsInReturn (s_seq s (s_return e)) t
 | if_ends_in_return: forall s1 s2 t e,
      StmtEndsInReturn s1 t -> StmtEndsInReturn s2 t ->
      StmtEndsInReturn (s_if e s1 s2) t
@@ -190,10 +195,10 @@ Inductive InExpr : forall t, var -> expr -> Prop :=
 
 (* variable gets used in a statement *)
 Inductive InStmt : forall t, var -> stmt -> Prop :=
-| instmt_block_front : forall t v st sts,
-    InStmt t v st -> InStmt t v (s_block (st :: sts))
-| instmt_block_cons : forall t v st sts,
-    InStmt t v (s_block sts) -> InStmt t v (s_block (st :: sts))
+| instmt_block_seq_1 : forall t v st1 st2,
+    InStmt t v st1 -> InStmt t v (s_seq st1 st2)
+| instmt_block_seq_2 : forall t v st1 st2,
+    InStmt t v st2 -> InStmt t v (s_seq st1 st2)
 | instmt_start : forall t v p e,
     InExpr t v e -> InStmt t v (s_start p e)
 | instmt_assign_var : forall t v e,
@@ -249,10 +254,10 @@ Inductive ExprVarRespectsT (t : type) (s : varidtype) : forall t', expr -> Prop 
 (* does this statement respect the usage of varname s to denote a type t? *)
 (* XXX note that in both of these, non-usage counts as respectful! *)
 Inductive StmtVarRespectsT (t : type) (s : varidtype) : stmt -> Prop :=
-| svrt_block_nil : StmtVarRespectsT t s (s_block [])
-| svrt_block_cons : forall st sts,
-    StmtVarRespectsT t s st -> StmtVarRespectsT t s (s_block sts) ->
-    StmtVarRespectsT t s (s_block (st :: sts))
+| svrt_block_nil : StmtVarRespectsT t s s_skip
+| svrt_block_cons : forall st1 st2,
+    StmtVarRespectsT t s st1 -> StmtVarRespectsT t s st2 ->
+    StmtVarRespectsT t s (s_seq st1 st2)
 | svrt_start : forall pt p e,
     (* XXX need to check pt against p *)
     ExprVarRespectsT t s pt e -> StmtVarRespectsT t s (s_start p e)

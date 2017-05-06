@@ -103,7 +103,7 @@ with
  * procs both take and produce values
  *)
 (*Inductive*) proc: Type :=
-| p_proc: type -> var -> stmt -> proc
+| mkproc: type -> var -> stmt -> proc
 .
 
 Notation "[{ s1 ; s2 ; }]" :=

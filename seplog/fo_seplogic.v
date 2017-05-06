@@ -243,13 +243,13 @@ Inductive hoare_stmt :
 (* XXX XXX XXX Just force rv to be a new var for now... *)
 | ht_call : forall {retC ret lk_invs},
             forall {PC PC' P P' QC QC' Q Q' rv rt pv s e val},
-            hoare_proc lk_invs PC P (p_proc rt pv s) QC Q ->
+            hoare_proc lk_invs PC P (mkproc rt pv s) QC Q ->
             (forall rho, PC' rho |-- PC (eval_expr e rho)) ->
             (forall rho, P' rho |-- P (eval_expr e rho)) ->
             hoare_stmt retC ret lk_invs
                        PC'
                        P'
-                           (s_call rv (p_proc rt pv s) e)
+                           (s_call rv (mkproc rt pv s) e)
                        (fun rho => !!(table_get rho rv = Some val) &&
                                    QC' rho *
                                    QC (eval_expr e rho) val)
@@ -325,12 +325,12 @@ Inductive hoare_stmt :
        Second, locks need to be able to be split. *)
 | ht_start: forall {retC ret lk_invs},
             forall {F P P' rt pv s e},
-            hoare_proc lk_invs a_emp P (p_proc rt pv s) ar_emp ar_emp ->
+            hoare_proc lk_invs a_emp P (mkproc rt pv s) ar_emp ar_emp ->
             (forall rho, P' rho |-- P (eval_expr e rho)) ->
             hoare_stmt retC ret lk_invs
                        e_emp
                        (fun rho => F rho * P' rho)
-                           (s_start (p_proc rt pv s) e)
+                           (s_start (mkproc rt pv s) e)
                        e_emp
                        F
 
@@ -386,7 +386,7 @@ with hoare_proc :
                                      s
                                      ETT
                                      EFF) ->
-               hoare_proc lk_invs PC P (p_proc t v s) QC Q.
+               hoare_proc lk_invs PC P (mkproc t v s) QC Q.
 
 Notation "{{ retC }} {{ ret }} {{ lk_invs }} ||- {{ PC }} {{ P }} s {{ QC }} {{ Q }}" :=
   (hoare_stmt retC ret lk_invs PC P s QC Q) (at level 90, s at next level).
@@ -448,7 +448,7 @@ Lemma ht_call_nf : forall {retC ret},
 *)
 
 Definition example1 :=
-  p_proc t_nat (mkvar t_nat 4) ([{
+  mkproc t_nat (mkvar t_nat 4) ([{
     s_return (e_read (mkvar t_nat 4)) ;
     s_skip ;
   }]).
@@ -509,7 +509,7 @@ Proof.
 Qed.
 
 Definition example2 :=
-  p_proc t_nat (mkvar t_nat 4) ([{
+  mkproc t_nat (mkvar t_nat 4) ([{
     s_call (mkvar t_nat 5) example1 (e_read (mkvar t_nat 4)) ;
     s_return (e_read (mkvar t_nat 5)) ;
   }]).

@@ -16,11 +16,6 @@ Import ListNotations.
  * abstract syntax the code is written in
  *)
 
-(* XXX remove this *)
-Definition s_prop := nat.
-
-Definition addr := nat.
-
 Inductive invariant : Type :=
 (* Just an example *)
 | nat_inv : invariant

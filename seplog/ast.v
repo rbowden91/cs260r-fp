@@ -45,14 +45,14 @@ Inductive addr: Type :=
 .
 
 Inductive value : Type :=
-| v_unit
-| v_nat (n:nat)
-| v_bool (b:bool)
-| v_pair (a:value) (b:value)
-| v_list (l:type * (list value))
-| v_addr (a:addr)
-| v_lock (a:addr)
-| v_undef
+| v_unit: value
+| v_nat  (n: nat): value
+| v_bool (b: bool): value
+| v_pair (a: value) (b: value): value
+| v_list (l: type * (list value)): value
+| v_addr (a: addr): value
+| v_lock (a: addr): value
+| v_undef: value
 .
 
 Inductive invariant : Type :=

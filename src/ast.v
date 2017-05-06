@@ -18,13 +18,13 @@ Import ListNotations.
 
 (* types are the types of values we can touch directly *)
 Inductive type :=
-| t_unit: type
-| t_nat: type
-| t_bool: type
-| t_pair: type -> type -> type
-| t_list: type -> type
-| t_addr: type -> type
-| t_lock: type -> type
+| t_unit : type
+| t_nat  : type
+| t_bool : type
+| t_pair : type -> type -> type
+| t_list : type -> type
+| t_addr : type -> type
+| t_lock : type -> type
 .
 
 (* variables are identified with numbers *)

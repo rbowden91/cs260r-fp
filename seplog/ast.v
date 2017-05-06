@@ -91,9 +91,11 @@ Inductive stmt: Type :=
 | s_assign: var -> expr -> stmt
 | s_load: var -> expr -> stmt
 | s_store: var -> expr -> stmt
+| s_scope: stmt -> stmt
 | s_if: expr -> stmt -> stmt -> stmt
 | s_while: expr -> stmt -> stmt
 | s_call: var -> proc -> expr -> stmt
+| s_local: var -> expr -> stmt
 | s_return: expr -> stmt
 | s_getlock: var -> stmt
 | s_putlock: var -> stmt

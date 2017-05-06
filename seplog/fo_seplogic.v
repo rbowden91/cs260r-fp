@@ -475,6 +475,7 @@ Proof.
   - admit. (* s_assign *)
   - admit. (* s_load *)
   - admit. (* s_store *)
+  - admit. (* s_scope *)
   - apply ht_if.
     apply ht_p_consequence with (P:=(fun _ => FF)).
     intro. normalize.
@@ -484,6 +485,7 @@ Proof.
     trivial.
   - admit. (* s_while *)
   - admit. (* s_call... shoot, how to handle induction on p? *)
+  - admit. (* s_local *)
   - admit. (* s_return *)
   - admit. (* s_getlock *)
   - admit. (* s_putlock *)

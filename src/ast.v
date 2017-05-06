@@ -16,59 +16,74 @@ Import ListNotations.
  * abstract syntax the code is written in
  *)
 
-(* XXX remove this *)
-Definition s_prop := nat.
+(* types are the types of values we can touch directly *)
+Inductive type :=
+| t_unit: type
+| t_nat: type
+| t_bool: type
+| t_pair: type -> type -> type
+| t_list: type -> type
+| t_lock: type -> type
+.
 
-Definition addr := nat.
-
-Inductive Invariant : Set -> Type :=
-(* Just an example *)
-| nat_inv : (s_prop * s_prop) -> Invariant nat
+(* variables are identified with numbers *)
+Inductive var: type -> Type :=
+| mkvar: forall t, nat -> var t
 .
 
 (* locks are a special class of variables *)
-Inductive Lock: Type -> Type :=
-| lock : forall t, Invariant t -> Lock t
+Inductive lock: type -> Type :=
+| mklock : forall t, nat -> bool -> lock t
 .
 
-(* variables are named with strings *)
-Inductive Var: Type -> Type :=
-| var: forall t, string -> Var t
+Inductive value: type -> Type :=
+| v_unit: value t_unit
+| v_nat (n: nat): value t_nat
+| v_bool (b: bool): value t_bool
+| v_pair (ta: type) (a: value ta) (tb: type) (b: value tb):
+     value (t_pair ta tb)
+| v_list (t: type) (l: list (value t)): value (t_list t)
+| v_lock (t: type) (l: lock t): value (t_lock t)
+.
+
+Inductive invariant : Type :=
+(* Just an example *)
+| nat_inv : invariant
 .
 
 (*
  * expressions produce values
  *)
-Inductive Expr: Type -> Type :=
-| value: forall (t : Type), t -> Expr t
-| read: forall (t: Type), Var t -> Expr t
-| cond: forall t, Expr bool -> Expr t -> Expr t -> Expr t
+Inductive expr: type -> Type :=
+| e_value: forall (t : type), value t -> expr t
+| e_read: forall (t: type), var t -> expr t
+| e_cond: forall t, expr t_bool -> expr t -> expr t -> expr t
 .
 
 (*
  * statements don't
  *)
-Inductive Stmt: Type :=
-| block: list Stmt -> Stmt
-| start: forall (pt : Type), Proc pt unit -> Expr pt -> Stmt
-| assign: forall t, Var t -> Expr t -> Stmt
-| load: forall t, Var t -> Lock t -> Stmt
-| store: forall t, Lock t -> Expr t -> Stmt
-| scope: Stmt -> Stmt
-| if_: Expr bool -> Stmt -> Stmt -> Stmt
-| while: Expr bool -> Stmt -> Stmt
-| call: forall (pt : Type) rt, Var rt -> Proc pt rt -> Expr pt -> Stmt
-| local: forall t, Var t -> Expr t -> Stmt
-| return_: forall t, Expr t -> Stmt
-| getlock: forall t, Lock t -> Stmt
-| putlock: forall t, Lock t -> Stmt
+Inductive stmt: Type :=
+| s_block: list stmt -> stmt
+| s_start: forall (pt : type), proc pt t_unit -> expr pt -> stmt
+| s_assign: forall t, var t -> expr t -> stmt
+| s_load: forall t, var t -> lock t -> stmt
+| s_store: forall t, lock t -> expr t -> stmt
+| s_scope: stmt -> stmt
+| s_if: expr t_bool -> stmt -> stmt -> stmt
+| s_while: expr t_bool -> stmt -> stmt
+| s_call: forall (pt : type) rt, var rt -> proc pt rt -> expr pt -> stmt
+| s_local: forall t, var t -> expr t -> stmt
+| s_return: forall t, expr t -> stmt
+| s_getlock: forall t, lock t -> stmt
+| s_putlock: forall t, lock t -> stmt
 with
 
 (*
  * procs both take and produce values
  *)
-(*Inductive*) Proc: Type -> Type -> Type :=
-| proc: forall pt rt, Var pt -> Stmt -> Proc pt rt
+(*Inductive*) proc: type -> type -> Type :=
+| mkproc: forall pt rt, var pt -> stmt -> proc pt rt
 .
 
 
@@ -76,9 +91,14 @@ with
  * Extended/sugary AST forms
  *)
 
-Definition coqcall {ta tr : Set} (f : ta -> tr) (x : ta): Expr tr :=
-   value tr (f x)
-.
+Definition v_true: value t_bool := v_bool true.
+Definition v_false: value t_bool := v_bool false.
 
-Definition skip: Stmt := block nil.
+(* doesn't quite work any more
+Definition e_coqcall {ta tr : type} (f : ta -> tr) (x : ta): expr tr :=
+   e_value tr (f x)
+.
+*)
+
+Definition s_skip: stmt := s_block nil.
 

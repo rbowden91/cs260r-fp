@@ -2,7 +2,7 @@ COQC=coqc
 COQDEP=coqdep
 COQFLAGS=-R VST/msl msl -R VST/veric veric -R VST/compcert compcert
 
-SRCS=ast.v fo_seplogic.v
+SRCS=ast.v table.v fo_seplogic.v
 
 .SUFFIXES: .v .vo
 

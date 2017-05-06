@@ -16,5 +16,4 @@ Require Import ast.
 Require Import astprops.
 Require Import semantics.
 Require Import logic.
-Require Import vfs.
 Require Import semantics.

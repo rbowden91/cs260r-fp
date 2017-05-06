@@ -5,9 +5,13 @@ SRCS=\
 	stringfacts.v string_as_ot.v base.v \
 	ast.v varmap.v astprops.v semantics.v soundness.v \
 	logic.v \
-	vfs.v \
-	caponfs.v \
 	all.v
+
+# These do not work any more - they depend on being able to have
+# values of arbitrary coq type, including with typeclasses. I want
+# to figure out how to fix this in a non-horrible way, but that is
+# not happening this weekend.
+#     vfs.v caponfs.v
 
 .SUFFIXES: .v .vo
 

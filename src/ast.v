@@ -75,7 +75,7 @@ Inductive invariant : Type :=
  *)
 Inductive expr: Type :=
 | e_value: type -> value -> expr
-| e_read: type -> var -> expr
+| e_read: var -> expr
 | e_cond: type -> expr -> expr -> expr -> expr
 .
 

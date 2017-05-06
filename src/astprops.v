@@ -61,18 +61,19 @@ Inductive VarsScopedStmt: VarMap type -> stmt -> VarMap type -> Prop :=
      VarsScopedStmt env (s_block (s :: ss)) env''
 | vars_scoped_start: forall env pt p e,
      VarsScopedExpr pt env e ->
-     VarsScopedStmt env (s_start pt p e) env
+     (* XXX check p against pt! *)
+     VarsScopedStmt env (s_start p e) env
 | vars_scoped_assign: forall t env id e,
      VarsScopedExpr t env e ->
      VarMapMapsTo (mkvar t id) t env ->
-     VarsScopedStmt env (s_assign t (mkvar t id) e) env
+     VarsScopedStmt env (s_assign (mkvar t id) e) env
 | vars_scoped_load: forall t env id l,
      VarMapMapsTo (mkvar t id) t env ->
-     VarsScopedStmt env (s_load t (mkvar t id) l) env
+     VarsScopedStmt env (s_load (mkvar t id) l) env
 | vars_scoped_store: forall t env id l e,
      @VarMapMapsTo type (mkvar t id) t env ->
      VarsScopedExpr t env e ->
-     VarsScopedStmt env (s_store t l e) env
+     VarsScopedStmt env (s_store l e) env
 | vars_scoped_scope: forall env s env',
      VarsScopedStmt env s env' ->
      VarsScopedStmt env (s_scope s) env
@@ -89,18 +90,19 @@ Inductive VarsScopedStmt: VarMap type -> stmt -> VarMap type -> Prop :=
      VarsScopedProc pt rt p ->
      VarsScopedExpr pt env arg ->
      VarMapMapsTo (mkvar rt id) rt env ->
-     VarsScopedStmt env (s_call pt rt (mkvar rt id) p arg) env
+     VarsScopedStmt env (s_call (mkvar rt id) p arg) env
 | vars_scoped_local: forall t env id e,
      VarsScopedExpr t env e ->
      ~(VarMapIn (mkvar t id) env) ->
-     VarsScopedStmt env (s_local t (mkvar t id) e) (VarMap_add (mkvar t id) t env)
+     VarsScopedStmt env (s_local (mkvar t id) e) (VarMap_add (mkvar t id) t env)
 | vars_scoped_return: forall t env e,
+     (* XXX this doesn't check against the proc type... *)
      VarsScopedExpr t env e ->
-     VarsScopedStmt env (s_return t e) env
-| vars_scoped_getlock: forall t env l,
-     VarsScopedStmt env (s_getlock t l) env
-| vars_scoped_putlock: forall t env l,
-     VarsScopedStmt env (s_getlock t l) env
+     VarsScopedStmt env (s_return e) env
+| vars_scoped_getlock: forall t env id,
+     VarsScopedStmt env (s_getlock (mkvar (t_lock t) id)) env
+| vars_scoped_putlock: forall t env id,
+     VarsScopedStmt env (s_getlock (mkvar (t_lock t) id)) env
 with
 (*Inductive*) VarsScopedProc: forall pt rt, proc -> Prop :=
 | vars_scoped_proc: forall pt rt id body env',
@@ -124,14 +126,14 @@ Inductive VarsUniqueStmt: stmt -> VarMap unit -> Prop :=
      VarsUniqueStmt (s_block ss) env' ->
      VarMapDisjoint unit env env' ->
      VarsUniqueStmt (s_block (s :: ss)) (VarMap_union env env')
-| vars_unique_start: forall pt p e,
-     VarsUniqueStmt (s_start pt p e) (VarMap_empty unit)
-| vars_unique_assign: forall t x e,
-     VarsUniqueStmt (s_assign t x e) (VarMap_empty unit)
-| vars_unique_load: forall t x l,
-     VarsUniqueStmt (s_load t x l) (VarMap_empty unit)
-| vars_unique_store: forall t l e,
-     VarsUniqueStmt (s_store t l e) (VarMap_empty unit)
+| vars_unique_start: forall p e,
+     VarsUniqueStmt (s_start p e) (VarMap_empty unit)
+| vars_unique_assign: forall x e,
+     VarsUniqueStmt (s_assign x e) (VarMap_empty unit)
+| vars_unique_load: forall x l,
+     VarsUniqueStmt (s_load x l) (VarMap_empty unit)
+| vars_unique_store: forall l e,
+     VarsUniqueStmt (s_store l e) (VarMap_empty unit)
 | vars_unique_if: forall pred ts fs env't env'f,
      VarsUniqueStmt ts env't ->
      VarsUniqueStmt fs env'f ->
@@ -142,15 +144,15 @@ Inductive VarsUniqueStmt: stmt -> VarMap unit -> Prop :=
      VarsUniqueStmt (s_while cond body) env'body
 | vars_unique_call: forall pt rt x p arg,
      VarsUniqueProc pt rt p ->
-     VarsUniqueStmt (s_call pt rt x p arg) (VarMap_empty unit)
-| vars_unique_local: forall t x e,
-     VarsUniqueStmt (s_local t x e) (VarMap_add x tt(*unit*) (VarMap_empty unit))
-| vars_unique_return: forall t e,
-     VarsUniqueStmt (s_return t e) (VarMap_empty unit)
-| vars_unique_getlock: forall t l,
-     VarsUniqueStmt (s_getlock t l) (VarMap_empty unit)
-| vars_unique_putlock: forall t l,
-     VarsUniqueStmt (s_getlock t l) (VarMap_empty unit)
+     VarsUniqueStmt (s_call x p arg) (VarMap_empty unit)
+| vars_unique_local: forall x e,
+     VarsUniqueStmt (s_local x e) (VarMap_add x tt(*unit*) (VarMap_empty unit))
+| vars_unique_return: forall e,
+     VarsUniqueStmt (s_return e) (VarMap_empty unit)
+| vars_unique_getlock: forall t id,
+     VarsUniqueStmt (s_getlock (mkvar (t_lock t) id)) (VarMap_empty unit)
+| vars_unique_putlock: forall t id,
+     VarsUniqueStmt (s_getlock (mkvar (t_lock t) id)) (VarMap_empty unit)
 with
 (*Inductive*) VarsUniqueProc: forall pt rt, proc -> Prop :=
 | vars_unique_proc: forall pt rt x body env',
@@ -164,12 +166,12 @@ with
 
 Inductive StmtEndsInReturn: stmt -> type -> Prop :=
 | block_ends_in_return: forall ss t e,
-     StmtEndsInReturn (s_block (ss ++ [s_return t e])) t
+     StmtEndsInReturn (s_block (ss ++ [s_return e])) t
 | if_ends_in_return: forall s1 s2 t e,
      StmtEndsInReturn s1 t -> StmtEndsInReturn s2 t ->
      StmtEndsInReturn (s_if e s1 s2) t
 | return_ends_in_return: forall t e,
-     StmtEndsInReturn (s_return t e) t
+     StmtEndsInReturn (s_return e) t
 with
 (*Inductive*) ProcReturnOk: forall pt rt, proc -> Prop :=
 | proc_return_ok: forall pt rt v s,
@@ -193,15 +195,15 @@ Inductive InStmt : forall t, var -> stmt -> Prop :=
 | instmt_block_cons : forall t v st sts,
     InStmt t v (s_block sts) -> InStmt t v (s_block (st :: sts))
 | instmt_start : forall t v p e,
-    InExpr t v e -> InStmt t v (s_start t p e)
+    InExpr t v e -> InStmt t v (s_start p e)
 | instmt_assign_var : forall t v e,
-    InStmt t v (s_assign t v e)
+    InStmt t v (s_assign v e)
 | instmt_assign_expr : forall t v v' e,
-    InExpr t v e -> InStmt t v (s_assign t v' e)
-| instmt_load : forall t v l,
-    InStmt t v (s_load t v l)
-| instmt_store : forall t v l e,
-    InExpr t v e -> InStmt t v (s_store t l e)
+    InExpr t v e -> InStmt t v (s_assign v' e)
+| instmt_load : forall t id l,
+    InStmt t (mkvar t id) (s_load (mkvar t id) l)
+| instmt_store : forall t id l e,
+    InExpr t (mkvar t id) e -> InStmt t (mkvar t id) (s_store l e)
 | instmt_if_cond : forall v b s1 s2,
     InExpr t_bool v b -> InStmt t_bool v (s_if b s1 s2)
 | instmt_if_body_1 : forall t v b s1 s2,
@@ -212,17 +214,17 @@ Inductive InStmt : forall t, var -> stmt -> Prop :=
     InExpr t_bool v b -> InStmt t_bool v (s_while b s)
 | instmt_while_body : forall t v b s,
     InStmt t v s -> InStmt t v (s_while b s)
-| instmt_call_var : forall t v pt p e,
-    InStmt t v (s_call pt t v p e)
-| instmt_call_expr : forall t v rt v' p e,
-    InExpr t v e -> InStmt t v (s_call t rt v' p e)
-| instmt_local_var : forall t v e,
-    InStmt t v (s_local t v e)
+| instmt_call_var : forall rt id p e,
+    InStmt rt (mkvar rt id) (s_call (mkvar rt id) p e)
+| instmt_call_expr : forall t v v' p e,
+    InExpr t v e -> InStmt t v (s_call v' p e)
+| instmt_local_var : forall t id e,
+    InStmt t (mkvar t id) (s_local (mkvar t id) e)
 | instmt_local_expr : forall t v v' e,
-    InExpr t v e -> InStmt t v (s_local t v' e)
+    InExpr t v e -> InStmt t v (s_local v' e)
 | instmt_return : forall t v e,
-    InExpr t v e -> InStmt t v (s_return t e)
-(* XXX it's never in getlock or putlock? *)
+    InExpr t v e -> InStmt t v (s_return e)
+(* XXX need to handle getlock and putlock *)
 .
 (* inspect to see that the constructor types were inferred properly *)
 (* Print InStmt. *)
@@ -252,15 +254,16 @@ Inductive StmtVarRespectsT (t : type) (s : varidtype) : stmt -> Prop :=
     StmtVarRespectsT t s st -> StmtVarRespectsT t s (s_block sts) ->
     StmtVarRespectsT t s (s_block (st :: sts))
 | svrt_start : forall pt p e,
-    ExprVarRespectsT t s pt e -> StmtVarRespectsT t s (s_start pt p e)
+    (* XXX need to check pt against p *)
+    ExprVarRespectsT t s pt e -> StmtVarRespectsT t s (s_start p e)
 | svrt_assign_eq : forall e,
-    ExprVarRespectsT t s t e -> StmtVarRespectsT t s (s_assign t (mkvar t s) e)
+    ExprVarRespectsT t s t e -> StmtVarRespectsT t s (s_assign (mkvar t s) e)
 | svrt_assign_neq : forall t' s' e,
-    s <> s' -> ExprVarRespectsT t s t' e -> StmtVarRespectsT t s (s_assign t' (mkvar t' s') e)
+    s <> s' -> ExprVarRespectsT t s t' e -> StmtVarRespectsT t s (s_assign (mkvar t' s') e)
 | svrt_load_eq : forall l,
-    StmtVarRespectsT t s (s_load t (mkvar t s) l)
+    StmtVarRespectsT t s (s_load (mkvar t s) l)
 | svrt_load_neq : forall t' s' l,
-    s <> s' -> StmtVarRespectsT t s (s_load t' (mkvar t' s') l)
+    s <> s' -> StmtVarRespectsT t s (s_load (mkvar t' s') l)
 | svrt_scope : forall s1,
     StmtVarRespectsT t s s1 ->
     StmtVarRespectsT t s (s_scope s1)
@@ -270,20 +273,21 @@ Inductive StmtVarRespectsT (t : type) (s : varidtype) : stmt -> Prop :=
 | svrt_while : forall b st,
     ExprVarRespectsT t s t_bool b -> StmtVarRespectsT t s st -> StmtVarRespectsT t s (s_while b st)
 | svrt_call_eq : forall pt p exp,
-    ExprVarRespectsT t s pt exp -> StmtVarRespectsT t s (s_call pt t (mkvar t s) p exp)
+    ExprVarRespectsT t s pt exp -> StmtVarRespectsT t s (s_call (mkvar t s) p exp)
 | svrt_call_neq : forall t' s' pt p exp,
-    s <> s' -> ExprVarRespectsT t s pt exp -> StmtVarRespectsT t s (s_call pt t' (mkvar t' s') p exp)
+    (* XXX does this bind pt properly? *)
+    s <> s' -> ExprVarRespectsT t s pt exp -> StmtVarRespectsT t s (s_call (mkvar t' s') p exp)
 | svrt_local_eq : forall e,
-    ExprVarRespectsT t s t e -> StmtVarRespectsT t s (s_local t (mkvar t s) e)
+    ExprVarRespectsT t s t e -> StmtVarRespectsT t s (s_local (mkvar t s) e)
 | svrt_local_neq : forall t' s' e,
-    s <> s' -> ExprVarRespectsT t s t' e -> StmtVarRespectsT t s (s_local t' (mkvar t' s') e)
+    s <> s' -> ExprVarRespectsT t s t' e -> StmtVarRespectsT t s (s_local (mkvar t' s') e)
 | svrt_return : forall t' e,
-    ExprVarRespectsT t s t' e -> StmtVarRespectsT t s (s_return t' e)
+    ExprVarRespectsT t s t' e -> StmtVarRespectsT t s (s_return e)
 (* XXX *)
-| svrt_getlock : forall t' l,
-    StmtVarRespectsT t s (s_getlock t' l)
-| svrt_putlock : forall t' l,
-    StmtVarRespectsT t s (s_putlock t' l)
+| svrt_getlock : forall t' id,
+    StmtVarRespectsT t s (s_getlock (mkvar (t_lock t') id))
+| svrt_putlock : forall t' id,
+    StmtVarRespectsT t s (s_putlock (mkvar (t_lock t') id))
 .
 (* inspect to see that the constructor types were inferred properly *)
 (* Print StmtVarRespectsT. *)

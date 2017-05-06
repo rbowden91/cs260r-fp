@@ -2,6 +2,7 @@ Require Import Arith.
 Require Import Omega.
 Require Import String.
 Require Import List.
+Require Import Program.
 Import ListNotations.
 
 Require Import OrderedType OrderedTypeEx.
@@ -463,6 +464,8 @@ Proof.
       * This case seems to demand decidable equality on types. This failed badly
       * when we wanted to have arbitrary coq types in the AST. Now we have our
       * own notion of types and they're decidable.
+      *
+      * Update: dependent destruction fixes this too.
       *)
      inversion H.
      (* make the existT rubbish go away *)
@@ -478,12 +481,14 @@ Proof.
      (*
       * now we have a fatal problem where extracting the bool from inside the
       * value t_bool loses the connection between the bool and the value, so
-      * destructing the bool leaves you stuck.
+      * destructing the bool leaves you stuck. aha: "dependent destruction"
+      * fixes this.
       *)
-     inversion pred; remember b as b'; destruct b; [exists vt | exists vf].
-     * apply cond_true_yields; auto. admit.
-     * apply cond_false_yields; auto. admit.
-Admitted.
+     dependent destruction pred.
+     destruct b;
+        [exists vt; apply cond_true_yields | exists vf; apply cond_false_yields];
+        auto.
+Qed.
 
 Lemma StmtStepsProgress_new:
   forall tyenv tyenv2 h l s,

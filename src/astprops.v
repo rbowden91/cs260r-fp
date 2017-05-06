@@ -107,7 +107,7 @@ with
 (*Inductive*) VarsScopedProc: forall pt rt, proc -> Prop :=
 | vars_scoped_proc: forall pt rt id body env',
      VarsScopedStmt (VarMap_add (mkvar pt id) pt (VarMap_empty type)) body env' ->
-     VarsScopedProc pt rt (mkproc (mkvar pt id) body rt)
+     VarsScopedProc pt rt (mkproc rt (mkvar pt id) body)
 .
 
 (* uniqueness *)
@@ -158,7 +158,7 @@ with
 | vars_unique_proc: forall rt x body env',
      VarMapDisjoint unit (VarMap_add x tt(*unit*) (VarMap_empty unit)) env' ->
      VarsUniqueStmt body env' ->
-     VarsUniqueProc (mkproc x body rt)
+     VarsUniqueProc (mkproc rt x body)
 .
 
 
@@ -176,7 +176,7 @@ with
 (*Inductive*) ProcReturnOk: forall rt, proc -> Prop :=
 | proc_return_ok: forall rt v s,
      StmtEndsInReturn s rt ->
-     ProcReturnOk rt (mkproc v s rt)
+     ProcReturnOk rt (mkproc rt v s)
 .
 
 
@@ -297,7 +297,7 @@ Inductive ProcVarRespectsT pt rt: proc -> Prop :=
 | pvrt : forall s st,
     StmtVarRespectsT pt s st ->
     (forall t s, InStmt t (mkvar t s) st -> StmtVarRespectsT t s st) ->
-    ProcVarRespectsT pt rt (mkproc (mkvar pt s) st rt)
+    ProcVarRespectsT pt rt (mkproc rt (mkvar pt s) st)
 .
 
 

@@ -102,7 +102,7 @@ with
  * procs both take and produce values
  *)
 (*Inductive*) proc: Type :=
-| mkproc: var -> stmt -> type -> proc
+| mkproc: type -> var -> stmt -> proc
 .
 
 

@@ -108,6 +108,28 @@ with
 | mkproc: type -> var -> stmt -> proc
 .
 
+
+(*
+ * Extended/sugary AST forms
+ *)
+
+Definition v_true: value := v_bool true.
+Definition v_false: value := v_bool false.
+
+(* doesn't quite work any more
+Definition e_coqcall {ta tr : type} (f : ta -> tr) (x : ta): expr tr :=
+   e_value tr (f x)
+.
+*)
+
+(* no longer relevant
+Definition s_skip: stmt := s_block nil.
+*)
+
+(*
+ * Notation
+ *)
+
 Notation "[{ s1 ; s2 ; }]" :=
   (s_seq s1 s2) (at level 90, s1 at next level, s2 at next level, format
 "'[v' [{ '[  ' '//' s1 ; '//' s2 ; ']' '//' }] ']'").

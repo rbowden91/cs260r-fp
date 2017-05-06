@@ -60,8 +60,8 @@ Inductive VarsScopedStmt: VarMap type -> stmt -> VarMap type -> Prop :=
      VarsScopedStmt env' (s_block ss) env'' ->
      VarsScopedStmt env (s_block (s :: ss)) env''
 | vars_scoped_start: forall env pt p e,
+     VarsScopedProc pt t_unit p ->
      VarsScopedExpr pt env e ->
-     (* XXX check p against pt! *)
      VarsScopedStmt env (s_start p e) env
 | vars_scoped_assign: forall t env id e,
      VarsScopedExpr t env e ->
@@ -107,7 +107,7 @@ with
 (*Inductive*) VarsScopedProc: forall pt rt, proc -> Prop :=
 | vars_scoped_proc: forall pt rt id body env',
      VarsScopedStmt (VarMap_add (mkvar pt id) pt (VarMap_empty type)) body env' ->
-     VarsScopedProc pt rt (mkproc pt rt (mkvar pt id) body)
+     VarsScopedProc pt rt (mkproc (mkvar pt id) body rt)
 .
 
 (* uniqueness *)
@@ -142,8 +142,8 @@ Inductive VarsUniqueStmt: stmt -> VarMap unit -> Prop :=
 | vars_unique_while: forall cond body env'body,
      VarsUniqueStmt body env'body ->
      VarsUniqueStmt (s_while cond body) env'body
-| vars_unique_call: forall pt rt x p arg,
-     VarsUniqueProc pt rt p ->
+| vars_unique_call: forall x p arg,
+     VarsUniqueProc p ->
      VarsUniqueStmt (s_call x p arg) (VarMap_empty unit)
 | vars_unique_local: forall x e,
      VarsUniqueStmt (s_local x e) (VarMap_add x tt(*unit*) (VarMap_empty unit))
@@ -154,11 +154,11 @@ Inductive VarsUniqueStmt: stmt -> VarMap unit -> Prop :=
 | vars_unique_putlock: forall t id,
      VarsUniqueStmt (s_getlock (mkvar (t_lock t) id)) (VarMap_empty unit)
 with
-(*Inductive*) VarsUniqueProc: forall pt rt, proc -> Prop :=
-| vars_unique_proc: forall pt rt x body env',
+(*Inductive*) VarsUniqueProc: proc -> Prop :=
+| vars_unique_proc: forall rt x body env',
      VarMapDisjoint unit (VarMap_add x tt(*unit*) (VarMap_empty unit)) env' ->
      VarsUniqueStmt body env' ->
-     VarsUniqueProc pt rt (mkproc pt rt x body)
+     VarsUniqueProc (mkproc x body rt)
 .
 
 
@@ -173,10 +173,10 @@ Inductive StmtEndsInReturn: stmt -> type -> Prop :=
 | return_ends_in_return: forall t e,
      StmtEndsInReturn (s_return e) t
 with
-(*Inductive*) ProcReturnOk: forall pt rt, proc -> Prop :=
-| proc_return_ok: forall pt rt v s,
+(*Inductive*) ProcReturnOk: forall rt, proc -> Prop :=
+| proc_return_ok: forall rt v s,
      StmtEndsInReturn s rt ->
-     ProcReturnOk pt rt (mkproc pt rt v s)
+     ProcReturnOk rt (mkproc v s rt)
 .
 
 
@@ -297,7 +297,7 @@ Inductive ProcVarRespectsT pt rt: proc -> Prop :=
 | pvrt : forall s st,
     StmtVarRespectsT pt s st ->
     (forall t s, InStmt t (mkvar t s) st -> StmtVarRespectsT t s st) ->
-    ProcVarRespectsT pt rt (mkproc pt rt (mkvar pt s) st)
+    ProcVarRespectsT pt rt (mkproc (mkvar pt s) st rt)
 .
 
 
@@ -308,6 +308,6 @@ Definition StmtOk s : Prop :=
 
 Definition ProcOk pt rt (p: proc): Prop :=
    (VarsScopedProc pt rt p) /\
-   (VarsUniqueProc pt rt p) /\
-   ProcReturnOk pt rt p
+   (VarsUniqueProc p) /\
+   ProcReturnOk rt p
 .

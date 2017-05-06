@@ -166,7 +166,7 @@ Inductive ThreadSteps: Heap -> Thread -> Heap -> Thread -> Prop :=
 			loc
 			stk
 			(s_call (mkvar rt retid)
-				(mkproc pt rt (mkvar pt paramid) body)
+				(mkproc (mkvar pt paramid) body rt)
 				arg)
 		 )
 		 h (thread
@@ -185,7 +185,7 @@ Inductive ThreadStepsStart: Thread -> Thread -> Thread -> Prop :=
 | thread_steps_start: forall loc stk pt paramid body arg argval,
      ExprYields pt loc arg argval ->
      ThreadStepsStart
-	(thread loc stk (s_start (mkproc pt t_unit (mkvar pt paramid) body) arg))
+	(thread loc stk (s_start (mkproc (mkvar pt paramid) body t_unit) arg))
         (thread loc stk s_skip)
 	(thread (NatMap.add paramid (mkval pt argval) (NatMap.empty val)) stack_empty body)
 .

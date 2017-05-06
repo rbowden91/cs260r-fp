@@ -49,7 +49,7 @@ Inductive value : Type :=
 | v_nat  (n: nat): value
 | v_bool (b: bool): value
 | v_pair (a: value) (b: value): value
-| v_list (l: type * (list value)): value
+| v_list (t: type) (l: list value): value
 | v_addr (a: addr): value
 | v_lock (a: addr): value
 | v_undef: value

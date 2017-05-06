@@ -117,7 +117,7 @@ Definition typeof_val (v : value) (t : type) : Prop :=
   | v_nat _ => t_nat = t
   | v_bool _ => t_bool = t
   | v_pair _ _ => False (* XXX notyet *)
-  | v_list t' => t_list t = t
+  | v_list t' _ => t_list t' = t
   | v_addr (mkaddr t' _ _) => t_addr t' = t
   | v_lock (mkaddr t' _ _) => t_lock t' = t
   | v_undef => False

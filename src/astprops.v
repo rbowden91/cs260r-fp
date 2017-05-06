@@ -38,7 +38,7 @@ Require Import varmap.
  *)
 
 (* scoping *)
-Inductive VarsScopedExpr: forall (t: type), VarMap type -> expr t -> Prop :=
+Inductive VarsScopedExpr: forall (t: type), VarMap type -> expr -> Prop :=
 | vars_scoped_value: forall (t: type) env k,
      VarsScopedExpr t env (e_value t k)
 | vars_scoped_read: forall (t: type) env id,
@@ -69,7 +69,7 @@ Inductive VarsScopedStmt: VarMap type -> stmt -> VarMap type -> Prop :=
      VarMapMapsTo (mkvar t id) t env ->
      VarsScopedStmt env (s_load t (mkvar t id) l) env
 | vars_scoped_store: forall t env id l e,
-     @VarMapMapsTo t type (mkvar t id) t env ->
+     @VarMapMapsTo type (mkvar t id) t env ->
      VarsScopedExpr t env e ->
      VarsScopedStmt env (s_store t l e) env
 | vars_scoped_scope: forall env s env',
@@ -101,7 +101,7 @@ Inductive VarsScopedStmt: VarMap type -> stmt -> VarMap type -> Prop :=
 | vars_scoped_putlock: forall t env l,
      VarsScopedStmt env (s_getlock t l) env
 with
-(*Inductive*) VarsScopedProc: forall pt rt, proc pt rt -> Prop :=
+(*Inductive*) VarsScopedProc: forall pt rt, proc -> Prop :=
 | vars_scoped_proc: forall pt rt id body env',
      VarsScopedStmt (VarMap_add (mkvar pt id) pt (VarMap_empty type)) body env' ->
      VarsScopedProc pt rt (mkproc pt rt (mkvar pt id) body)
@@ -151,7 +151,7 @@ Inductive VarsUniqueStmt: stmt -> VarMap unit -> Prop :=
 | vars_unique_putlock: forall t l,
      VarsUniqueStmt (s_getlock t l) (VarMap_empty unit)
 with
-(*Inductive*) VarsUniqueProc: forall pt rt, proc pt rt -> Prop :=
+(*Inductive*) VarsUniqueProc: forall pt rt, proc -> Prop :=
 | vars_unique_proc: forall pt rt x body env',
      VarMapDisjoint unit (VarMap_add x tt(*unit*) (VarMap_empty unit)) env' ->
      VarsUniqueStmt body env' ->
@@ -170,7 +170,7 @@ Inductive StmtEndsInReturn: stmt -> type -> Prop :=
 | return_ends_in_return: forall t e,
      StmtEndsInReturn (s_return t e) t
 with
-(*Inductive*) ProcReturnOk: forall pt rt, proc pt rt -> Prop :=
+(*Inductive*) ProcReturnOk: forall pt rt, proc -> Prop :=
 | proc_return_ok: forall pt rt v s,
      StmtEndsInReturn s rt ->
      ProcReturnOk pt rt (mkproc pt rt v s)
@@ -178,7 +178,7 @@ with
 
 
 (* variable gets read by an expression *)
-Inductive InExpr : forall t, var t -> expr t -> Prop :=
+Inductive InExpr : forall t, var -> expr -> Prop :=
 | inexpr_read : forall t v,
     InExpr t v (e_read t v)
 | inexpr_cond : forall t v b e1 e2,
@@ -186,7 +186,7 @@ Inductive InExpr : forall t, var t -> expr t -> Prop :=
 .
 
 (* variable gets used in a statement *)
-Inductive InStmt : forall t, var t -> stmt -> Prop :=
+Inductive InStmt : forall t, var -> stmt -> Prop :=
 | instmt_block_front : forall t v st sts,
     InStmt t v st -> InStmt t v (s_block (st :: sts))
 | instmt_block_cons : forall t v st sts,
@@ -231,7 +231,7 @@ Inductive InStmt : forall t, var t -> stmt -> Prop :=
 (* Inductive InProc := . *)
 
 (* does this expression respect the usage of varname s to denote a type t? *)
-Inductive ExprVarRespectsT (t : type) (s : varidtype) : forall t', expr t' -> Prop :=
+Inductive ExprVarRespectsT (t : type) (s : varidtype) : forall t', expr -> Prop :=
 | evrt_value : forall t' exp,
     ExprVarRespectsT t s t' (e_value t' exp)
 | evrt_read_eq : (* expr type had better be the same *)
@@ -288,7 +288,7 @@ Inductive StmtVarRespectsT (t : type) (s : varidtype) : stmt -> Prop :=
 (* Print StmtVarRespectsT. *)
 
 (* does a proc respect variable usage? *)
-Inductive ProcVarRespectsT pt rt: proc pt rt -> Prop :=
+Inductive ProcVarRespectsT pt rt: proc -> Prop :=
 | pvrt : forall s st,
     StmtVarRespectsT pt s st ->
     (forall t s, InStmt t (mkvar t s) st -> StmtVarRespectsT t s st) ->
@@ -301,7 +301,7 @@ Definition StmtOk s : Prop :=
    (forall env', VarsUniqueStmt s env')
 .
 
-Definition ProcOk pt rt (p: proc pt rt): Prop :=
+Definition ProcOk pt rt (p: proc): Prop :=
    (VarsScopedProc pt rt p) /\
    (VarsUniqueProc pt rt p) /\
    ProcReturnOk pt rt p

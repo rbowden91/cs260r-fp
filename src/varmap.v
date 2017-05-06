@@ -27,7 +27,7 @@ Require Import ast.
  * around with it.
  *)
 
-Definition var_id {t} (x: var t) :=
+Definition var_id (x: var) :=
    match x with
    | mkvar _ id => id
    end.
@@ -78,11 +78,9 @@ Admitted.
 
 Definition VarMap := NatMap.t.
 Definition VarMap_empty := NatMap.empty.
-Definition VarMap_add {t} {t2} (k: var t) (v: t2) m :=
-   NatMap.add (var_id k) v m.
+Definition VarMap_add {t} k (v: t) m := NatMap.add (var_id k) v m.
 Definition VarMap_union {t} m1 m2 := @NatMap_union t m1 m2.
 Definition VarMapDisjoint := NatMapProperties.Disjoint.
-Definition VarMapIn {t} {t2} (k: var t) (m: NatMap.t t2) :=
-   NatMap.In (var_id k) m.
-Definition VarMapMapsTo {t} {t2} (k: var t) (v: t2) (m: NatMap.t t2) :=
+Definition VarMapIn {t} k (m: NatMap.t t) := NatMap.In (var_id k) m.
+Definition VarMapMapsTo {t} (k: var) (v: t) (m: NatMap.t t) :=
    NatMap.MapsTo (var_id k) v m.

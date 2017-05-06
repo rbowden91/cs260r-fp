@@ -36,9 +36,6 @@ Require Import ast.
  * Statements are executed destructively.
  *)
 
-(* XXX placeholders *)
-Hypotheses addr_from_lock: forall t, lock t -> nat.
-
 (**************************************************************)	
 (* stores *)
 
@@ -51,7 +48,8 @@ Definition Heap := NatMap.t val.
 Definition Locals := NatMap.t val.
 *)
 
-Inductive val: Type := mkval (t: type) (a : value t): val.
+(* XXX kill this off *)
+Inductive val: Type := mkval (t: type) (a : value): val.
 
 Definition Heap := NatMap.t val.
 Definition Locals := NatMap.t val.
@@ -63,10 +61,10 @@ End Stores.
 
 Section Expressions.
 
-Inductive ExprYields: forall t, Locals -> expr t -> value t -> Prop :=
+Inductive ExprYields: forall t, Locals -> expr -> value -> Prop :=
 | value_yields: forall loc t a,
     ExprYields t loc (e_value t a) a
-| read_yields: forall loc t (x : var t) id a,
+| read_yields: forall loc t (x : var) id a,
     x = mkvar t id -> NatMap.find id loc = Some (mkval t a) ->
     ExprYields t loc (e_read t x) a
 | cond_true_yields: forall t loc e et ef a,
@@ -96,14 +94,16 @@ Inductive StmtSteps: Heap -> Locals -> stmt -> Heap -> Locals -> stmt -> Prop :=
 | step_assign: forall h loc id type e a,
      ExprYields type loc e a ->
      StmtSteps h loc (s_assign type (mkvar type id) e) h (NatMap.add id (mkval type a) loc) s_skip
-| step_load: forall h loc id type lid lb lk addr a,
-     lk = mklock type lid lb -> addr_from_lock type lk = addr -> (* XXX *)
-     NatMap.find addr h = Some (mkval type a) ->
-     StmtSteps h loc (s_load type (mkvar type id) lk) h (NatMap.add id (mkval type a) loc) s_skip
-| step_store: forall h loc type lid lb lk addr e a,
-     lk = mklock type lid lb -> addr_from_lock type lk = addr -> (* XXX *)
+| step_load: forall h loc type lid e hid heapnum a,
+     (* XXX this is wrong *)
+     ExprYields type loc e (v_addr (mkaddr type hid heapnum)) ->
+     NatMap.find hid h = Some (mkval type a) ->
+     StmtSteps h loc (s_load type (mkvar type lid) e) h (NatMap.add lid (mkval type a) loc) s_skip
+| step_store: forall h loc type lid e hid heapnum a,
+     (* XXX this is wrong *)
      ExprYields type loc e a ->
-     StmtSteps h loc (s_store type lk e) (NatMap.add addr (mkval type a) h) loc s_skip
+     ExprYields type loc (e_read type (mkvar type lid)) (v_addr (mkaddr type hid heapnum)) ->
+     StmtSteps h loc (s_store type (mkvar type lid) e) (NatMap.add hid (mkval type a) h) loc s_skip
 | step_scope: forall h loc s h' loc' s',
      StmtSteps h loc s h' loc' s' ->
      StmtSteps h loc (s_scope s) h' loc' (s_scope s')
@@ -141,7 +141,7 @@ Section Stacks.
 
 Inductive Stack: Type :=
 | stack_empty: Stack
-| stack_pending: forall t, Locals -> var t -> Stack -> Stack
+| stack_pending: forall (t : type), Locals -> var -> Stack -> Stack
 .
 
 End Stacks.

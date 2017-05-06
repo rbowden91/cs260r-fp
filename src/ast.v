@@ -27,19 +27,24 @@ Inductive type :=
 | t_lock : type -> type
 .
 
-(* variables are identified with numbers *)
+(* variables are identified by numbers *)
 Inductive var: Type :=
 | mkvar: type -> nat -> var
 .
+
+Definition type_of_var v :=
+   match v with
+   | mkvar t _ => t
+   end.
 
 (* heap addresses are also numbers (and which heap, currently a bool) *)
 Inductive addr: Type :=
 | mkaddr : type -> nat -> bool -> addr
 .
 
-Inductive value: Type :=
+Inductive value : Type :=
 | v_unit: value
-| v_nat (n: nat): value
+| v_nat  (n: nat): value
 | v_bool (b: bool): value
 | v_pair (a: value) (b: value): value
 | v_list (t: type) (l: list value): value

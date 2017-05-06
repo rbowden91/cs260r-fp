@@ -1,22 +1,26 @@
 PAPER=paper.tex
+TEXFILES=sections.tex
 
 TEX=latex
+BIBTEX=bibtex
 
 ############################################################
 
 .SUFFIXES: .tex .dvi .ps .pdf
 
-all: paper.pdf
+all: $(PAPER:.tex=.pdf)
 
-.tex.pdf: paper.bib
+$(PAPER:.tex=.pdf): $(TEXFILES) $(PAPER:.tex=.bib)
+
+.tex.pdf:
 	pdf$(TEX) $<
 	pdf$(TEX) $<
-	bibtex paper
+	$(BIBTEX) $(PAPER:.tex=)
 	pdf$(TEX) $<
 
 clean:
-	rm -f *~ *.log *.aux *.blg *.bbl
-	rm -f paper.pdf
+	rm -f *~ *.dvi *.ps *.log *.aux *.bbl *.blg
+	rm -f $(PAPER:.tex=.pdf)
 
 .PHONY: clean
 

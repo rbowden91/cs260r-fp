@@ -102,7 +102,7 @@ Function eval_expr (e : expr) (env : env) : value :=
     | None => v_undef
     end
   | e_value v => v
-  | e_cond b e1 e2 =>
+  | e_cond ty b e1 e2 =>
     match eval_expr b env with
     | v_bool true => eval_expr e1 env
     | v_bool false => eval_expr e2 env
@@ -130,10 +130,12 @@ Function typeof_expr (e : expr) (rho : env) (t : type) : Prop :=
                 | Some _ => type_of_var v = t
                 end
   | e_value v => typeof_val v t
-  | e_cond eb e1 e2 =>
+  | e_cond ty eb e1 e2 => ty = t
+(* XXX?
     typeof_expr eb rho t_bool /\
     typeof_expr e1 rho t /\
     typeof_expr e2 rho t
+*)
   end.
 
 Lemma tt_sound :

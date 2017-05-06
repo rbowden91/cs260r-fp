@@ -55,6 +55,18 @@ Inductive value : Type :=
 | v_undef: value
 .
 
+Function type_of_value (v: value): type :=
+   match v with
+   | v_unit => t_unit
+   | v_nat _ => t_nat
+   | v_bool _ => t_bool
+   | v_pair a b => t_pair (type_of_value a) (type_of_value b)
+   | v_list t l => t
+   | v_addr (mkaddr ty _ _) => ty
+   | v_lock (mkaddr ty _ _) => ty
+   | v_undef => t_unit (* XXX *)
+   end.
+
 Inductive invariant : Type :=
 (* Just an example *)
 | nat_inv : invariant

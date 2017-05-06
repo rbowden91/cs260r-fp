@@ -16,19 +16,23 @@ Import ListNotations.
  * abstract syntax the code is written in
  *)
 
-Inductive invariant : Type :=
-(* Just an example *)
-| nat_inv : invariant
-.
-
-(* locks are a special class of variables *)
-Inductive lock: Type -> Type :=
-| mklock : forall t, invariant -> lock t
-.
+(* types go here *)
 
 (* variables are identified with numbers *)
 Inductive var: Type -> Type :=
 | mkvar: forall t, nat -> var t
+.
+
+(* locks are a special class of variables *)
+Inductive lock: Type -> Type :=
+| mklock : forall t, nat -> bool -> lock t
+.
+
+(* values go here *)
+
+Inductive invariant : Type :=
+(* Just an example *)
+| nat_inv : invariant
 .
 
 (*

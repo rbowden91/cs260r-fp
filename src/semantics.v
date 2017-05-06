@@ -89,12 +89,12 @@ Inductive StmtSteps: Heap -> Locals -> stmt -> Heap -> Locals -> stmt -> Prop :=
 | step_assign: forall h loc id type e a,
      ExprYields type loc e a ->
      StmtSteps h loc (s_assign type (mkvar type id) e) h (NatMap.add id (mkval type a) loc) s_skip
-| step_load: forall h loc id type inv lk addr a,
-     lk = mklock type inv -> addr_from_lock type lk = addr -> (* XXX *)
+| step_load: forall h loc id type lid lb lk addr a,
+     lk = mklock type lid lb -> addr_from_lock type lk = addr -> (* XXX *)
      NatMap.find addr h = Some (mkval type a) ->
      StmtSteps h loc (s_load type (mkvar type id) lk) h (NatMap.add id (mkval type a) loc) s_skip
-| step_store: forall h loc type inv lk addr e a,
-     lk = mklock type inv -> addr_from_lock type lk = addr -> (* XXX *)
+| step_store: forall h loc type lid lb lk addr e a,
+     lk = mklock type lid lb -> addr_from_lock type lk = addr -> (* XXX *)
      ExprYields type loc e a ->
      StmtSteps h loc (s_store type lk e) (NatMap.add addr (mkval type a) h) loc s_skip
 | step_scope: forall h loc s h' loc' s',

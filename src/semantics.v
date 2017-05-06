@@ -44,7 +44,14 @@ Hypotheses addr_from_lock: forall t, lock t -> nat.
 
 Section Stores.
 
+(* old form that used coq types directly
 Inductive val: Type := mkval (t: Type) (a : t): val.
+
+Definition Heap := NatMap.t val.
+Definition Locals := NatMap.t val.
+*)
+
+Inductive val: Type := mkval (t: type) (a : value t): val.
 
 Definition Heap := NatMap.t val.
 Definition Locals := NatMap.t val.
@@ -56,18 +63,18 @@ End Stores.
 
 Section Expressions.
 
-Inductive ExprYields: forall t, Locals -> expr t -> t -> Prop :=
+Inductive ExprYields: forall t, Locals -> expr t -> value t -> Prop :=
 | value_yields: forall loc t a,
     ExprYields t loc (e_value t a) a
 | read_yields: forall loc t (x : var t) id a,
     x = mkvar t id -> NatMap.find id loc = Some (mkval t a) ->
     ExprYields t loc (e_read t x) a
 | cond_true_yields: forall t loc e et ef a,
-    ExprYields bool loc e true ->
+    ExprYields t_bool loc e v_true ->
     ExprYields t loc et a ->
     ExprYields t loc (e_cond t e et ef) a
 | cond_false_yields: forall t loc e et ef a,
-    ExprYields bool loc e false ->
+    ExprYields t_bool loc e v_false ->
     ExprYields t loc ef a ->
     ExprYields t loc (e_cond t e et ef) a
 .
@@ -103,17 +110,17 @@ Inductive StmtSteps: Heap -> Locals -> stmt -> Heap -> Locals -> stmt -> Prop :=
 | step_endscope: forall h loc,
      StmtSteps h loc (s_scope s_skip) h loc s_skip
 | step_if_true: forall h loc e st sf,
-     ExprYields bool loc e true ->
+     ExprYields t_bool loc e v_true ->
      StmtSteps h loc (s_if e st sf) h loc (s_scope st)
 | step_if_false: forall h loc e st sf,
-     ExprYields bool loc e false ->
+     ExprYields t_bool loc e v_false ->
      StmtSteps h loc (s_if e st sf) h loc (s_scope sf)
 | step_while_true: forall h loc e body,
-     ExprYields bool loc e true ->
+     ExprYields t_bool loc e v_true ->
      StmtSteps h loc (s_while e body)
                h loc (s_block [s_scope body; s_while e body])
 | step_while_false: forall h loc e body,
-     ExprYields bool loc e false ->
+     ExprYields t_bool loc e v_false ->
      StmtSteps h loc (s_while e body) h loc s_skip
 | step_local: forall h loc id type e a,
      NatMap.find id loc = None ->
@@ -178,7 +185,7 @@ Inductive ThreadStepsStart: Thread -> Thread -> Thread -> Prop :=
 | thread_steps_start: forall loc stk pt paramid body arg argval,
      ExprYields pt loc arg argval ->
      ThreadStepsStart
-	(thread loc stk (s_start pt (mkproc pt unit (mkvar pt paramid) body) arg))
+	(thread loc stk (s_start pt (mkproc pt t_unit (mkvar pt paramid) body) arg))
         (thread loc stk s_skip)
 	(thread (NatMap.add paramid (mkval pt argval) (NatMap.empty val)) stack_empty body)
 .

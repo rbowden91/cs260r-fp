@@ -38,20 +38,20 @@ Require Import varmap.
  *)
 
 (* scoping *)
-Inductive VarsScopedExpr: forall (t: Type), VarMap Type -> expr t -> Prop :=
-| vars_scoped_value: forall (t: Type) env k,
+Inductive VarsScopedExpr: forall (t: type), VarMap type -> expr t -> Prop :=
+| vars_scoped_value: forall (t: type) env k,
      VarsScopedExpr t env (e_value t k)
-| vars_scoped_read: forall (t: Type) env id,
+| vars_scoped_read: forall (t: type) env id,
      VarMapMapsTo (mkvar t id) t env ->
      VarsScopedExpr t env (e_read t (mkvar t id))
 | vars_scoped_cond: forall t env pred te fe,
-     VarsScopedExpr bool env pred ->
+     VarsScopedExpr t_bool env pred ->
      VarsScopedExpr t env te ->
      VarsScopedExpr t env fe ->
      VarsScopedExpr t env (e_cond t pred te fe)
 .
 
-Inductive VarsScopedStmt: VarMap Type -> stmt -> VarMap Type -> Prop :=
+Inductive VarsScopedStmt: VarMap type -> stmt -> VarMap type -> Prop :=
 | vars_scoped_block_nil: forall env,
      VarsScopedStmt env (s_block []) env
 | vars_scoped_block_cons: forall env s env' ss env'',
@@ -69,19 +69,19 @@ Inductive VarsScopedStmt: VarMap Type -> stmt -> VarMap Type -> Prop :=
      VarMapMapsTo (mkvar t id) t env ->
      VarsScopedStmt env (s_load t (mkvar t id) l) env
 | vars_scoped_store: forall t env id l e,
-     @VarMapMapsTo t Type (mkvar t id) t env ->
+     @VarMapMapsTo t type (mkvar t id) t env ->
      VarsScopedExpr t env e ->
      VarsScopedStmt env (s_store t l e) env
 | vars_scoped_scope: forall env s env',
      VarsScopedStmt env s env' ->
      VarsScopedStmt env (s_scope s) env
 | vars_scoped_if: forall env pred ts fs env't env'f,
-     VarsScopedExpr bool env pred ->
+     VarsScopedExpr t_bool env pred ->
      VarsScopedStmt env ts env't ->
      VarsScopedStmt env fs env'f ->
      VarsScopedStmt env (s_if pred ts fs) env
 | vars_scoped_while: forall env pred body env'body,
-     VarsScopedExpr bool env pred ->
+     VarsScopedExpr t_bool env pred ->
      VarsScopedStmt env body env'body ->
      VarsScopedStmt env (s_while pred body) env
 | vars_scoped_call: forall env pt rt id p arg,
@@ -103,7 +103,7 @@ Inductive VarsScopedStmt: VarMap Type -> stmt -> VarMap Type -> Prop :=
 with
 (*Inductive*) VarsScopedProc: forall pt rt, proc pt rt -> Prop :=
 | vars_scoped_proc: forall pt rt id body env',
-     VarsScopedStmt (VarMap_add (mkvar pt id) pt (VarMap_empty Type)) body env' ->
+     VarsScopedStmt (VarMap_add (mkvar pt id) pt (VarMap_empty type)) body env' ->
      VarsScopedProc pt rt (mkproc pt rt (mkvar pt id) body)
 .
 
@@ -161,7 +161,7 @@ with
 
 (* check that procedure returns are ok *)
 
-Inductive StmtEndsInReturn: stmt -> Type -> Prop :=
+Inductive StmtEndsInReturn: stmt -> type -> Prop :=
 | block_ends_in_return: forall ss t e,
      StmtEndsInReturn (s_block (ss ++ [s_return t e])) t
 | if_ends_in_return: forall s1 s2 t e,
@@ -202,13 +202,13 @@ Inductive InStmt : forall t, var t -> stmt -> Prop :=
 | instmt_store : forall t v l e,
     InExpr t v e -> InStmt t v (s_store t l e)
 | instmt_if_cond : forall v b s1 s2,
-    InExpr bool v b -> InStmt bool v (s_if b s1 s2)
+    InExpr t_bool v b -> InStmt t_bool v (s_if b s1 s2)
 | instmt_if_body_1 : forall t v b s1 s2,
     InStmt t v s1 -> InStmt t v (s_if b s1 s2)
 | instmt_if_body_2 : forall t v b s1 s2,
     InStmt t v s2 -> InStmt t v (s_if b s1 s2)
 | instmt_while_cond : forall v b s,
-    InExpr bool v b -> InStmt bool v (s_while b s)
+    InExpr t_bool v b -> InStmt t_bool v (s_while b s)
 | instmt_while_body : forall t v b s,
     InStmt t v s -> InStmt t v (s_while b s)
 | instmt_call_var : forall t v pt p e,
@@ -231,7 +231,7 @@ Inductive InStmt : forall t, var t -> stmt -> Prop :=
 (* Inductive InProc := . *)
 
 (* does this expression respect the usage of varname s to denote a type t? *)
-Inductive ExprVarRespectsT (t : Type) (s : varidtype) : forall t', expr t' -> Prop :=
+Inductive ExprVarRespectsT (t : type) (s : varidtype) : forall t', expr t' -> Prop :=
 | evrt_value : forall t' exp,
     ExprVarRespectsT t s t' (e_value t' exp)
 | evrt_read_eq : (* expr type had better be the same *)
@@ -239,13 +239,13 @@ Inductive ExprVarRespectsT (t : Type) (s : varidtype) : forall t', expr t' -> Pr
 | evrt_read_neq : forall t' s', (* don't care about expr type *)
     s <> s' -> ExprVarRespectsT t s t' (e_read t' (mkvar t' s'))
 | evrt_cond : forall t' b exp1 exp2,
-    ExprVarRespectsT t s bool b -> ExprVarRespectsT t s t' exp1 -> ExprVarRespectsT t s t' exp2 ->
+    ExprVarRespectsT t s t_bool b -> ExprVarRespectsT t s t' exp1 -> ExprVarRespectsT t s t' exp2 ->
     ExprVarRespectsT t s t' (e_cond t' b exp1 exp2)
 .
 
 (* does this statement respect the usage of varname s to denote a type t? *)
 (* XXX note that in both of these, non-usage counts as respectful! *)
-Inductive StmtVarRespectsT (t : Type) (s : varidtype) : stmt -> Prop :=
+Inductive StmtVarRespectsT (t : type) (s : varidtype) : stmt -> Prop :=
 | svrt_block_nil : StmtVarRespectsT t s (s_block [])
 | svrt_block_cons : forall st sts,
     StmtVarRespectsT t s st -> StmtVarRespectsT t s (s_block sts) ->
@@ -264,10 +264,10 @@ Inductive StmtVarRespectsT (t : Type) (s : varidtype) : stmt -> Prop :=
     StmtVarRespectsT t s s1 ->
     StmtVarRespectsT t s (s_scope s1)
 | svrt_if : forall b s1 s2,
-    ExprVarRespectsT t s bool b -> StmtVarRespectsT t s s1 -> StmtVarRespectsT t s s2 ->
+    ExprVarRespectsT t s t_bool b -> StmtVarRespectsT t s s1 -> StmtVarRespectsT t s s2 ->
     StmtVarRespectsT t s (s_if b s1 s2)
 | svrt_while : forall b st,
-    ExprVarRespectsT t s bool b -> StmtVarRespectsT t s st -> StmtVarRespectsT t s (s_while b st)
+    ExprVarRespectsT t s t_bool b -> StmtVarRespectsT t s st -> StmtVarRespectsT t s (s_while b st)
 | svrt_call_eq : forall pt p exp,
     ExprVarRespectsT t s pt exp -> StmtVarRespectsT t s (s_call pt t (mkvar t s) p exp)
 | svrt_call_neq : forall t' s' pt p exp,

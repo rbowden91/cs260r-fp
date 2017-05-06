@@ -21,7 +21,7 @@ Require Import astprops.
 Require Import semantics.
 
 (* env is sound relative to tyenv *)
-Definition localenv_sound_new (tyenv: VarMap Type) (env: Locals): Prop :=
+Definition localenv_sound_new (tyenv: VarMap type) (env: Locals): Prop :=
    forall t id,
       VarMapMapsTo (mkvar t id) t tyenv ->
       exists a, NatMap.MapsTo id (mkval t a) env.
@@ -32,7 +32,7 @@ Definition localenv_sound (env: Locals) (prog : stmt): Prop :=
     exists a, NatMap.find name env = Some (mkval t a).
 
 Lemma localenv_weaken (env: Locals) (prog: stmt):
-   forall (t : Set) name,
+   forall (t : type) name,
       localenv_sound env prog ->
       StmtVarRespectsT t name prog ->
       NatMap.find name env = None -> False.
@@ -47,7 +47,7 @@ Proof.
 Qed.
 
 Lemma localenv_weaken2 (env: Locals) (prog: stmt):
-   forall (t : Set) name,
+   forall (t : type) name,
       localenv_sound env prog ->
       StmtVarRespectsT t name prog ->
       (forall t' a, NatMap.find name env = Some (mkval t' a) -> t' = t).
@@ -418,6 +418,28 @@ Lemma MachineStepsPreserves_new:
 Proof.
 Admitted.
 
+(* XXX this should be put somewhere else *)
+Lemma type_dec:
+   forall (t1 t2: type),
+   {t1 = t2} + {t1 <> t2}.
+Proof.
+   intro.
+   induction t1; intros.
+   1-3: destruct t2; subst; auto; right; discriminate.
+   - induction t2; subst.
+     1-3,5-6: right; discriminate.
+     destruct IHt1_1 with (t2 := t2_1);
+       destruct IHt1_2 with (t2 := t2_2);
+       subst; auto; right; congruence.
+   - induction t2; subst.
+     1-4,6: right; discriminate.
+     destruct IHt1 with (t2 := t2);
+        subst; auto; right; congruence.
+   - induction t2; subst.
+     1-5: right; discriminate.
+     destruct IHt1 with (t2 := t2);
+        subst; auto; right; congruence.
+Qed.
 
 Lemma ExprStepsProgress_new:
   forall t tyenv l e,
@@ -426,9 +448,9 @@ Lemma ExprStepsProgress_new:
     exists a, ExprYields t l e a.
 Proof.
    intros. revert H H0. revert tyenv l.
-   remember e as e1. revert Heqe1. revert e1.
+   (*remember e as e1. revert Heqe1. revert e1.*)
    induction e; intros.
-   - subst. exists t0. apply value_yields.
+   - subst. exists v. apply value_yields.
    - subst. inversion H; subst.
      unfold localenv_sound_new in H0.
      apply H0 in H4.
@@ -437,8 +459,30 @@ Proof.
      apply read_yields with (id := id); auto.
      apply NatMap.find_1.
      auto.
-   - (* this is problematic *)
-     admit.
+   - (*
+      * This case seems to demand decidable equality on types. This failed badly
+      * when we wanted to have arbitrary coq types in the AST. Now we have our
+      * own notion of types and they're decidable.
+      *)
+     inversion H.
+     (* make the existT rubbish go away *)
+     apply Eqdep_dec.inj_pair2_eq_dec in H2; try apply type_dec.
+     apply Eqdep_dec.inj_pair2_eq_dec in H3; try apply type_dec.
+     subst.
+     apply IHe1 with (l := l) in H6; auto.
+     apply IHe2 with (l := l) in H7; auto.
+     apply IHe3 with (l := l) in H8; auto.
+     destruct H6 as [pred H6].
+     destruct H7 as [vt H7].
+     destruct H8 as [vf H8].
+     (*
+      * now we have a fatal problem where extracting the bool from inside the
+      * value t_bool loses the connection between the bool and the value, so
+      * destructing the bool leaves you stuck.
+      *)
+     inversion pred; remember b as b'; destruct b; [exists vt | exists vf].
+     * apply cond_true_yields; auto. admit.
+     * apply cond_false_yields; auto. admit.
 Admitted.
 
 Lemma StmtStepsProgress_new:

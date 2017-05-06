@@ -23,6 +23,7 @@ Inductive type :=
 | t_bool: type
 | t_pair: type -> type -> type
 | t_list: type -> type
+| t_addr: type -> type
 | t_lock: type -> type
 .
 

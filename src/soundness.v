@@ -428,16 +428,20 @@ Proof.
    induction t1; intros.
    1-3: destruct t2; subst; auto; right; discriminate.
    - induction t2; subst.
-     1-3,5-6: right; discriminate.
+     1-3,5-7: right; discriminate.
      destruct IHt1_1 with (t2 := t2_1);
        destruct IHt1_2 with (t2 := t2_2);
        subst; auto; right; congruence.
    - induction t2; subst.
-     1-4,6: right; discriminate.
+     1-4,6-7: right; discriminate.
      destruct IHt1 with (t2 := t2);
         subst; auto; right; congruence.
    - induction t2; subst.
-     1-5: right; discriminate.
+     1-5,7: right; discriminate.
+     destruct IHt1 with (t2 := t2);
+        subst; auto; right; congruence.
+   - induction t2; subst.
+     1-6: right; discriminate.
      destruct IHt1 with (t2 := t2);
         subst; auto; right; congruence.
 Qed.

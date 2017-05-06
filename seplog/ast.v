@@ -22,18 +22,21 @@ Import Relations.
 Inductive type :=
 | t_nat
 | t_bool
+| t_addr : type -> type
 | t_lock : type -> type
+| t_list : type -> type
 .
 
 Definition var := (nat * type)%type.
 
-(* nat gives the number of elements of type |type| *)
-Definition lock := (nat * bool * type)%type.
+Definition addr := (nat * bool * type)%type.
 
 Inductive value : Type :=
 | v_nat (n:nat)
 | v_bool (b:bool)
-| v_lock (l:lock)
+| v_addr (a:addr)
+| v_lock (a:addr)
+| v_list (l:type * (list value))
 | v_undef
 .
 
@@ -45,7 +48,7 @@ Proof.
 Admitted.
 
 
-Instance EqDec_lock : EqDec (lock) := _.
+Instance EqDec_lock : EqDec (addr) := _.
 Proof.
 Admitted.
 
@@ -81,7 +84,7 @@ Qed.
 
 
 Definition env := table var value.
-Definition state := table lock value.
+Definition state := table addr value.
 
 (*
  * expressions produce values
@@ -100,14 +103,14 @@ Inductive stmt: Type :=
 | s_seq: stmt -> stmt -> stmt
 | s_start: proc -> expr -> stmt
 | s_assign: var -> expr -> stmt
-| s_load: var -> lock -> stmt
-| s_store: lock -> expr -> stmt
+| s_load: var -> expr -> stmt
+| s_store: var -> expr -> stmt
 | s_if: expr -> stmt -> stmt -> stmt
 | s_while: expr -> stmt -> stmt
 | s_call: var -> proc -> expr -> stmt
 | s_return: expr -> stmt
-| s_getlock: lock -> stmt
-| s_putlock: lock -> stmt
+| s_getlock: var -> stmt
+| s_putlock: var -> stmt
 with
 
 (*

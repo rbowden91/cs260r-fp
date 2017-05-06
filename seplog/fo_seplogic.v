@@ -13,10 +13,10 @@ Require Import ast.
 Require Import List.
 Import ListNotations.
 
-Definition world := (lock -> option value)%type.
+Definition world := (addr -> option value)%type.
 
 Instance Join_world: Join world :=
-	Join_fun lock (option value) (Join_lower (Join_discrete value)).
+	Join_fun addr (option value) (Join_lower (Join_discrete value)).
 
 
 Instance Perm_world : Perm_alg world := _.
@@ -45,24 +45,28 @@ Definition defined (x: var) : assertion :=
 
 Definition subst (x : var) (y : value) (P: assertion) : assertion :=
    fun rho => fun w => P (table_set x y rho) w.
-(*
-(* XXX *_mapsto has to involve vars? *)
-Definition heap_mapsto (x y: var) : pred world :=
+
+Definition mapsto (x:addr) (y:value) : pred world :=
  fun w =>
+    exists v, w x = Some v /\
+    y = v
+.
+
+Definition ex_mapsto (x:addr) : pred world :=
+ fun w =>
+    exists v, w x = Some v
+.
+
+(* Original mapsto:
     exists ax, get_stack w x = Some (v_addr ax) /\
     exists ay, get_stack w y = Some ay /\
     forall a, if eq_dec a ax then get_heap w a = Some ay else get_heap w a = None.
-
-Definition disk_mapsto (x y: var) : pred world :=
- fun w =>
-    exists ax, get_stack w x = Some (v_addr ax) /\
-    exists ay, get_stack w y = Some ay /\
-    forall a, if eq_dec a ax then get_disk w a = Some ay else get_disk w a = None.
-
-Definition equal (x y: var) : pred world :=
-            fun w => fst w x = fst w y.
 *)
-(* XXX local?? *)
+
+Definition equal (x y: addr) : pred world :=
+            fun w => w x = w y.
+
+(* XXX more stuff goes here *)
 Inductive modvars : stmt -> var -> Prop :=
 | mod_assign: forall x e, modvars (s_assign x e) x
 | mod_load: forall x l, modvars (s_load x l) x
@@ -100,11 +104,13 @@ Function eval_expr (e : expr) (env : env) : value :=
   end
 .
 
-Function typeof_val (v : value) (t : type) : Prop :=
+Definition typeof_val (v : value) (t : type) : Prop :=
   match v with
   | v_nat _ => t_nat = t
   | v_bool _ => t_bool = t
-  | v_lock (n,b,t') => t_lock t' = t
+  | v_lock (_,_,t') => t_lock t' = t
+  | v_addr (_,_,t') => t_addr t' = t
+  | v_list t' => t_list t = t
   | v_undef => False
   end.
 
@@ -128,7 +134,15 @@ Proof.
 Admitted.
 
 Notation ETT := (fun (_ : env) => TT).
+Notation ATT := (fun (_ : value) => TT).
+Notation ARTT := (fun (_ : value) => fun (_ : value) => TT).
 Notation EFF := (fun (_ : env) => FF).
+Notation AFF := (fun (_ : value) => FF).
+Notation ARFF := (fun (_ : value) => fun (_ : value) => FF).
+
+Notation e_emp := (fun (_ : env) => FF).
+Notation a_emp := (fun (_ : value) => FF).
+Notation ar_emp := (fun (_ : value) => fun (_ : value) => FF).
 
 (*
 Definition lift0 {B} (P: B) : env -> B := fun _ => P.
@@ -138,15 +152,34 @@ Definition lift2 {A1 A2 B} (P: A1 -> A2 -> B) (f1: env -> A1) (f2: env -> A2):
 *)
 (*Definition local: (world -> Prop) -> world -> pred world :=  lift1 prop.*)
 Local Open Scope logic.
+
 Definition assign_forward (v : var) (e : expr) (P : assertion) (rho : env) := 
   EX old:value,
     (!!(table_get rho v = Some (eval_expr e (table_set v old rho)))
     && P (table_set v old rho)).
 
+Definition assign_forward_load (v : var) (a:value) (ptr:addr) (e : expr) (P : assertion) (rho : env) := 
+  !!(table_get rho v = Some a) && EX old:value, (
+     !!(eval_expr e (table_set v old rho) = v_addr ptr)
+     && mapsto ptr a
+     && P (table_set v old rho)).
+
+
+(* XXX make this an option (pred world * pred world)? Some kind of type checking
+       on the address? We want to keep t_lock t_nat and t_nat in different address
+       spaces. *)
+Notation lk_inv_map := (value -> pred world * pred world).
+
+Definition crash_inv (lk:value) (lk_invs : lk_inv_map) :=
+  fst (lk_invs lk).
+
+Definition reg_inv (lk:value) (lk_invs : lk_inv_map) :=
+  snd (lk_invs lk).
+
 Inductive hoare_stmt :
   (value -> pred world) -> (* retC *)
   (value -> pred world) -> (* ret *)
-  (lock -> pred world * pred world) -> (* lk_invs *)
+  lk_inv_map -> (* lk_invs *)
   assertion -> assertion -> stmt -> assertion -> assertion -> Prop :=
 
 | ht_skip : forall retC ret lk_invs,
@@ -225,13 +258,73 @@ Inductive hoare_stmt :
 *)
 
 | ht_getlock : forall retC ret lk_invs,
-               forall lk,
+               forall v a lk, (* XXX should this go as an EX? *)
                hoare_stmt retC ret lk_invs
-                          (fun rho => emp) (fun rho => emp)
-                            (s_getlock lk)
-                          (fun rho => fst (lk_invs lk)) (fun rho => snd (lk_invs lk))
+                          (fun rho => emp)
+                          (fun rho => EX t:type, (!!(snd v = t_addr (t_lock t))
+                                      && !!(table_get rho v = Some (v_addr a))
+                                      && mapsto a lk))
+                            (s_getlock v)
+                          (fun rho => crash_inv lk lk_invs)
+                          (fun rho => EX t:type, (!!(snd v = t_addr (t_lock t))
+                                      && !!(table_get rho v = Some (v_addr a))
+                                      && mapsto a lk * reg_inv lk lk_invs))
+
+| ht_putlock : forall retC ret lk_invs,
+               forall v a lk, (* XXX should this go as an EX? *)
+               hoare_stmt retC ret lk_invs
+                          (fun rho => crash_inv lk lk_invs)
+                          (fun rho => EX t:type, (!!(snd v = t_addr (t_lock t))
+                                      && !!(table_get rho v = Some (v_addr a))
+                                      && mapsto a lk * reg_inv lk lk_invs))
+                            (s_putlock v)
+                          (fun rho => emp)
+                          (fun rho => EX t:type, (!!(snd v = t_addr (t_lock t))
+                                      && !!(table_get rho v = Some (v_addr a))
+                                      && mapsto a lk))
+
+| ht_load : forall {retC ret lk_invs},
+            forall {P C e v},
+            forall a ptr,
+            hoare_stmt retC ret lk_invs
+                           C
+                           (fun rho => P rho && !!(typeof_expr e rho (t_addr (snd v)))
+                                       && !!(eval_expr e rho = v_addr ptr)
+                                       * mapsto ptr a)
+                              (s_load v e)
+                           (assign_forward_load v a ptr e C)
+                           (assign_forward_load v a ptr e P)
+
+| ht_store : forall {retC ret lk_invs},
+            forall {P C e v},
+            forall ptr t val,
+            hoare_stmt retC ret lk_invs
+                           C
+                           (fun rho => P rho && !!(snd v = t_addr t)
+                                       && !!(typeof_expr e rho t)
+                                       && !!(table_get rho v = Some (v_addr ptr))
+                                       && !!(eval_expr e rho = val)
+                                       * ex_mapsto ptr)
+                              (s_store v e)
+                           C
+                           (fun rho => P rho && !!(snd v = t_addr t)
+                                       && !!(table_get rho v = Some (v_addr ptr))
+                                       * mapsto ptr val)
+(* XXX First, we can pass off crash conditions in the same way we frame them.
+       Second, locks need to be able to be split. *)
+| ht_start: forall {retC ret lk_invs},
+            forall {F P P' rt pv s e},
+            hoare_proc lk_invs a_emp P (p_proc rt pv s) ar_emp ar_emp ->
+            (forall rho, P' rho |-- P (eval_expr e rho)) ->
+            hoare_stmt retC ret lk_invs
+                       e_emp
+                       (fun rho => F rho * P' rho)
+                           (s_start (p_proc rt pv s) e)
+                       e_emp
+                       F
 
 (* Stmt rules not directly related to the language *)
+
 | ht_consequence : forall retC ret lk_invs,
                    forall PC PC' QC QC' P P' Q Q' s,
                    hoare_stmt retC ret lk_invs
@@ -252,25 +345,24 @@ Inductive hoare_stmt :
              hoare_stmt retC ret lk_invs
                         PC (fun rho => (P rho) * (R rho)) s QC (fun rho => (Q rho) * (R rho))
 
-(*
-| ht_frame_crash : forall retC ret lk_invs,
-                   forall PC QC P Q R s,
-                   hoare_stmt retC ret lk_invs
-                              PC P s QC Q ->
-                   hoare_stmt retC ret lk_invs
-                              (fun rho => (PC rho) * (R rho))
-                              (fun rho => (P rho) * (R rho) * l) 
-                                  s 
-                              (fun rho => (QC rho) * (R rho))
-                              (fun rho => (Q rho) * (R rho) * l)
-*)
+(* XXX Don't have to frame out other locks due to the resource invariant! *)
+| ht_frame_lock : forall retC ret lk_invs,
+                  forall PC QC P Q s a l,
+                  hoare_stmt retC ret lk_invs
+                             PC P s QC Q ->
+                  hoare_stmt retC ret lk_invs
+                             (fun rho => (PC rho) * crash_inv l lk_invs)
+                             (fun rho => (P rho) * reg_inv l lk_invs * mapsto a l) 
+                                 s
+                             (fun rho => (QC rho) * crash_inv l lk_invs)
+                             (fun rho => (Q rho) * reg_inv l lk_invs * mapsto a l)
 
 (* XXX semax_extract_prop? *)
 
 (* These *don't* take assertions, because (for now) they don't need to take
  * the environment (argument / return value are explicitly passed in) *)
 with hoare_proc :
-  (lock -> pred world * pred world) ->
+  lk_inv_map ->
   (value -> pred world) -> (value -> pred world) -> proc -> 
   (value -> value -> pred world) -> (value -> value -> pred world) -> Prop :=
 | ht_proc : forall PC QC P Q t v s lk_invs,

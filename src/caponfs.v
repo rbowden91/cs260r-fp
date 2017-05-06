@@ -77,16 +77,16 @@ Function caponfs_getvnode fs inum: caponvnode :=
         end
    end.
 
-Hypothesis caponfs_lookup: Proc (caponvnode * string) (option caponvnode).
-Hypothesis caponfs_create: Proc (caponvnode * string) (option caponvnode).
-Hypothesis caponfs_unlink: Proc (caponvnode * string) (option unit).
-Hypothesis caponfs_read: Proc (caponvnode * nat * nat) bytes.
-Hypothesis caponfs_write: Proc (caponvnode * bytes * nat) unit.
-Hypothesis caponfs_truncate: Proc (caponvnode * nat) unit.
-Hypothesis caponfs_fsync: Proc caponvnode unit.
-Hypothesis caponfs_getroot: Proc caponfs caponvnode.
-Hypothesis caponfs_sync: Proc caponfs unit.
-Hypothesis caponfs_newfs: Proc unit caponfs.
+Hypothesis caponfs_lookup: proc (caponvnode * string) (option caponvnode).
+Hypothesis caponfs_create: proc (caponvnode * string) (option caponvnode).
+Hypothesis caponfs_unlink: proc (caponvnode * string) (option unit).
+Hypothesis caponfs_read: proc (caponvnode * nat * nat) bytes.
+Hypothesis caponfs_write: proc (caponvnode * bytes * nat) unit.
+Hypothesis caponfs_truncate: proc (caponvnode * nat) unit.
+Hypothesis caponfs_fsync: proc caponvnode unit.
+Hypothesis caponfs_getroot: proc caponfs caponvnode.
+Hypothesis caponfs_sync: proc caponfs unit.
+Hypothesis caponfs_newfs: proc unit caponfs.
 
 Instance caponvnode_is_vnode: vnodeclass caponvnode := {
    inum_of_vnode := caponfs_inum;

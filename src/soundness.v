@@ -2,6 +2,7 @@ Require Import Arith.
 Require Import Omega.
 Require Import String.
 Require Import List.
+Require Import Program.
 Import ListNotations.
 
 Require Import OrderedType OrderedTypeEx.
@@ -21,21 +22,21 @@ Require Import astprops.
 Require Import semantics.
 
 (* env is sound relative to tyenv *)
-Definition localenv_sound_new (tyenv: VarMap Type) (env: Locals): Prop :=
+Definition localenv_sound_new (tyenv: VarMap type) (env: Locals): Prop :=
    forall t id,
-      VarMapMapsTo (var t id) t tyenv ->
-      exists a, StringMap.MapsTo id (mkval t a) env.
+      VarMapMapsTo (mkvar t id) t tyenv ->
+      exists a, NatMap.MapsTo id (mkval t a) env.
 
-Definition localenv_sound (env: Locals) (prog : Stmt): Prop :=
+Definition localenv_sound (env: Locals) (prog : stmt): Prop :=
   forall t name,
     StmtVarRespectsT t name prog ->
-    exists a, StringMap.find name env = Some (mkval t a).
+    exists a, NatMap.find name env = Some (mkval t a).
 
-Lemma localenv_weaken (env: Locals) (prog: Stmt):
-   forall (t : Set) name,
+Lemma localenv_weaken (env: Locals) (prog: stmt):
+   forall (t : type) name,
       localenv_sound env prog ->
       StmtVarRespectsT t name prog ->
-      StringMap.find name env = None -> False.
+      NatMap.find name env = None -> False.
 Proof.
    intros.
    unfold localenv_sound in H.
@@ -46,11 +47,11 @@ Proof.
    discriminate.
 Qed.
 
-Lemma localenv_weaken2 (env: Locals) (prog: Stmt):
-   forall (t : Set) name,
+Lemma localenv_weaken2 (env: Locals) (prog: stmt):
+   forall (t : type) name,
       localenv_sound env prog ->
       StmtVarRespectsT t name prog ->
-      (forall t' a, StringMap.find name env = Some (mkval t' a) -> t' = t).
+      (forall t' a, NatMap.find name env = Some (mkval t' a) -> t' = t).
 Proof.
    intros.
    unfold localenv_sound in H.
@@ -63,11 +64,11 @@ Qed.
 
 
 (*
-Lemma localenv_weaken_new (env: Locals) (prog: Stmt):
+Lemma localenv_weaken_new (env: Locals) (prog: stmt):
    forall tyenv tyenv' name,
       localenv_sound_x env prog ->
       VarsScopedStmt tyenv prog tyenv' ->
-      StringMap.find name env = None -> False.
+      NatMap.find name env = None -> False.
 Proof.
    intros.
    unfold localenv_sound_x in H.
@@ -78,11 +79,11 @@ Proof.
    discriminate.
 Qed.
 
-Lemma localenv_weaken2_new (env: Locals) (prog: Stmt):
+Lemma localenv_weaken2_new (env: Locals) (prog: stmt):
    forall tyenv tyenv' name,
       localenv_sound_x env prog ->
       VarsScopedStmt tyenv prog tyenv' ->
-      (forall t' a, StringMap.find name env = Some (mkval t' a) -> t' = t).
+      (forall t' a, NatMap.find name env = Some (mkval t' a) -> t' = t).
 Proof.
    intros.
    unfold localenv_sound in H.
@@ -147,8 +148,8 @@ Proof.
       specialize (H0 t name).
       inversion H0; subst.
       * exists a.
-        rewrite StringMapFacts.add_eq_o; auto.
-      * rewrite StringMapFacts.add_neq_o; auto.
+        rewrite NatMapFacts.add_eq_o; auto.
+      * rewrite NatMapFacts.add_neq_o; auto.
     + intros; constructor.
   - split.
     + unfold localenv_sound in *.
@@ -156,8 +157,8 @@ Proof.
       specialize (H0 t name).
       inversion H0; subst.
       * exists a.
-        rewrite StringMapFacts.add_eq_o; auto.
-      * rewrite StringMapFacts.add_neq_o; auto.
+        rewrite NatMapFacts.add_eq_o; auto.
+      * rewrite NatMapFacts.add_neq_o; auto.
     + intros; constructor.
   - split.
     + unfold localenv_sound in *.
@@ -215,7 +216,7 @@ Lemma StmtStepsProgress :
   forall h l s,
     localenv_sound l s ->
     (forall t name, StmtVarRespectsT t name s) ->
-    s <> skip ->
+    s <> s_skip ->
     exists h' l' s',
       StmtSteps h l s h' l' s'.
 Proof.
@@ -228,64 +229,64 @@ Admitted.
 Lemma localenv_sound_addition:
    forall tyenv loc t id a,
    localenv_sound_new tyenv loc ->
-   ~(VarMapIn (var t id) tyenv) ->
+   ~(VarMapIn (mkvar t id) tyenv) ->
    localenv_sound_new
-        (VarMap_add (var t id) t tyenv)
-        (StringMap.add id (mkval t a) loc).
+        (VarMap_add (mkvar t id) t tyenv)
+        (NatMap.add id (mkval t a) loc).
 Proof.
    unfold localenv_sound_new.
    intros.
-   destruct (string_dec id0 id).
+   destruct (Nat.eq_dec id0 id).
    - subst.
      assert (t0 = t) by
         (unfold VarMapMapsTo in *;
          unfold VarMap_add in *;
          unfold var_id in *;
-         rewrite varmap.StringMapFacts.add_mapsto_iff in H1;
+         rewrite varmap.NatMapFacts.add_mapsto_iff in H1;
          destruct H1 as [H1 | H1]; destruct H1;
          try contradiction; auto).
      subst.
      exists a.
-     apply StringMap.add_1.
+     apply NatMap.add_1.
      auto.
    - unfold VarMapMapsTo in *.
      unfold VarMap_add in *.
      unfold var_id in *.
-     rewrite varmap.StringMapFacts.add_neq_mapsto_iff in H1; auto.
+     rewrite varmap.NatMapFacts.add_neq_mapsto_iff in H1; auto.
      apply H in H1.
      destruct H1 as [a0 H1].
      exists a0.
-     apply StringMap.add_2; auto.
+     apply NatMap.add_2; auto.
 Qed.
 
 Lemma localenv_sound_replacement:
    forall tyenv loc t id a,
    localenv_sound_new tyenv loc ->
-   VarMapMapsTo (var t id) t tyenv ->
-   localenv_sound_new tyenv (StringMap.add id (mkval t a) loc).
+   VarMapMapsTo (mkvar t id) t tyenv ->
+   localenv_sound_new tyenv (NatMap.add id (mkval t a) loc).
 Proof.
    unfold localenv_sound_new.
    intros.
-   destruct (string_dec id0 id).
+   destruct (Nat.eq_dec id0 id).
    - subst.
      assert (t0 = t) by
         (unfold VarMapMapsTo in *;
         unfold var_id in *;
         unfold VarMap in tyenv;
-        apply varmap.StringMapFacts.MapsTo_fun with (m := tyenv) (x := id);
+        apply varmap.NatMapFacts.MapsTo_fun with (m := tyenv) (x := id);
         auto).
      subst.
      specialize H with (t := t) (id := id).
      apply H in H0.
      destruct H0 as [a0 H0].
      exists a.
-     apply StringMap.add_1.
+     apply NatMap.add_1.
      auto.
    - specialize H with (t := t0) (id := id0).
      apply H in H1.
      destruct H1 as [a0 H1].
      exists a0.
-     apply StringMap.add_2; auto.
+     apply NatMap.add_2; auto.
 Qed.
 
 Lemma StmtStepsPreserves_new :
@@ -418,6 +419,28 @@ Lemma MachineStepsPreserves_new:
 Proof.
 Admitted.
 
+(* XXX this should be put somewhere else *)
+Lemma type_dec:
+   forall (t1 t2: type),
+   {t1 = t2} + {t1 <> t2}.
+Proof.
+   intro.
+   induction t1; intros.
+   1-3: destruct t2; subst; auto; right; discriminate.
+   - induction t2; subst.
+     1-3,5-6: right; discriminate.
+     destruct IHt1_1 with (t2 := t2_1);
+       destruct IHt1_2 with (t2 := t2_2);
+       subst; auto; right; congruence.
+   - induction t2; subst.
+     1-4,6: right; discriminate.
+     destruct IHt1 with (t2 := t2);
+        subst; auto; right; congruence.
+   - induction t2; subst.
+     1-5: right; discriminate.
+     destruct IHt1 with (t2 := t2);
+        subst; auto; right; congruence.
+Qed.
 
 Lemma ExprStepsProgress_new:
   forall t tyenv l e,
@@ -426,36 +449,62 @@ Lemma ExprStepsProgress_new:
     exists a, ExprYields t l e a.
 Proof.
    intros. revert H H0. revert tyenv l.
-   remember e as e1. revert Heqe1. revert e1.
+   (*remember e as e1. revert Heqe1. revert e1.*)
    induction e; intros.
-   - subst. exists t0. apply value_yields.
+   - subst. exists v. apply value_yields.
    - subst. inversion H; subst.
      unfold localenv_sound_new in H0.
      apply H0 in H4.
      destruct H4 as [a H4].
      exists a.
      apply read_yields with (id := id); auto.
-     apply StringMap.find_1.
+     apply NatMap.find_1.
      auto.
-   - (* this is problematic *)
-     admit.
-Admitted.
+   - (*
+      * This case seems to demand decidable equality on types. This failed badly
+      * when we wanted to have arbitrary coq types in the AST. Now we have our
+      * own notion of types and they're decidable.
+      *
+      * Update: dependent destruction fixes this too.
+      *)
+     inversion H.
+     (* make the existT rubbish go away *)
+     apply Eqdep_dec.inj_pair2_eq_dec in H2; try apply type_dec.
+     apply Eqdep_dec.inj_pair2_eq_dec in H3; try apply type_dec.
+     subst.
+     apply IHe1 with (l := l) in H6; auto.
+     apply IHe2 with (l := l) in H7; auto.
+     apply IHe3 with (l := l) in H8; auto.
+     destruct H6 as [pred H6].
+     destruct H7 as [vt H7].
+     destruct H8 as [vf H8].
+     (*
+      * now we have a fatal problem where extracting the bool from inside the
+      * value t_bool loses the connection between the bool and the value, so
+      * destructing the bool leaves you stuck. aha: "dependent destruction"
+      * fixes this.
+      *)
+     dependent destruction pred.
+     destruct b;
+        [exists vt; apply cond_true_yields | exists vf; apply cond_false_yields];
+        auto.
+Qed.
 
 Lemma StmtStepsProgress_new:
   forall tyenv tyenv2 h l s,
     VarsScopedStmt tyenv s tyenv2 ->
     localenv_sound_new tyenv l ->
-    s <> skip ->
-    (forall t p arg, s = start t p arg -> False) ->
-    (forall pt rt x p e, s = call pt rt x p e -> False) ->
-    (forall rt e, s = return_ rt e -> False) ->
+    s <> s_skip ->
+    (forall t p arg, s = s_start t p arg -> False) ->
+    (forall pt rt x p e, s = s_call pt rt x p e -> False) ->
+    (forall rt e, s = s_return rt e -> False) ->
     exists h' l' s',
       StmtSteps h l s h' l' s'.
 Proof.
   intros tyenv tyenv2 h l s; revert tyenv tyenv2 h l.
   induction s; intros.
   - destruct l.
-    * unfold skip; contradiction.
+    * unfold s_skip; contradiction.
     * admit.
   - specialize (H2 pt p e). contradiction.
   - inversion H; subst.
@@ -463,8 +512,8 @@ Proof.
     destruct H10 as [a H10].
     remember v as v1.
     destruct v1.
-    exists h, (StringMap.add s (mkval t a) l), skip.
-    apply step_assign with (h := h) (loc := l) (id := s) (type := t) (e := e) (a := a).
+    exists h, (NatMap.add n (mkval t a) l), s_skip.
+    apply step_assign with (h := h) (loc := l) (id := n) (type := t) (e := e) (a := a).
     assert (e1 = e) by admit.
     subst; auto.
   - (* TBD *)
@@ -488,7 +537,7 @@ Definition threadstmt (t: Thread) :=
 Lemma ThreadStepsProgress_new:
    forall tyenv tyenv2 h t,
       ThreadStateSound tyenv t tyenv2 ->
-      (forall ty p arg, threadstmt t = start ty p arg -> False) ->
+      (forall ty p arg, threadstmt t = s_start ty p arg -> False) ->
       exists h' t',
          ThreadSteps h t h' t'.
 Proof.
@@ -497,7 +546,7 @@ Admitted.
 Lemma ThreadStepsStartProgress_new:
    forall tyenv tyenv2 t,
       ThreadStateSound tyenv t tyenv2 ->
-      (exists ty p arg, threadstmt t = start ty p arg) ->
+      (exists ty p arg, threadstmt t = s_start ty p arg) ->
       exists t' tnew,
          ThreadStepsStart t t' tnew.
 Proof.

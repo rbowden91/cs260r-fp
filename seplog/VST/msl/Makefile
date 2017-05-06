@@ -4,7 +4,9 @@ COQFLAGS=-R . msl -R ../compcert/lib compcert.lib
 
 # these are the ones we use directly; make depend before building
 # to get the ones used indirectly (quite a few)
-SRCS=eq_dec.v msl_direct.v Coqlib2.v seplog.v log_normalize.v
+SRCS=\
+	eq_dec.v msl_direct.v Coqlib2.v seplog.v log_normalize.v \
+	alg_seplog_direct.v
 
 .SUFFIXES: .v .vo
 

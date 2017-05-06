@@ -13,6 +13,13 @@ Require Import ast.
 Require Import List.
 Import ListNotations.
 
+Require Import table.
+
+Definition env := table var value.
+Definition state := table addr value.
+
+
+
 Definition world := (addr -> option value)%type.
 
 Instance Join_world: Join world :=

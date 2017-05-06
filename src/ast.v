@@ -4,6 +4,8 @@ Require Import String.
 Require Import List.
 Import ListNotations.
 
+Require Import msl.eq_dec.
+
 (* ************************************************************ *)
 (* ************************************************************ *)
 (*                                                              *)
@@ -123,3 +125,22 @@ Definition e_coqcall {ta tr : type} (f : ta -> tr) (x : ta): expr tr :=
 (* no longer relevant
 Definition s_skip: stmt := s_block nil.
 *)
+
+(*
+ * Notation
+ *)
+
+Notation "[{ s1 ; s2 ; }]" :=
+  (s_seq s1 s2) (at level 90, s1 at next level, s2 at next level, format
+"'[v' [{ '[  ' '//' s1 ; '//' s2 ; ']' '//' }] ']'").
+
+
+Instance EqDec_var : EqDec (var) := _.
+Proof.
+Admitted.
+
+
+Instance EqDec_lock : EqDec (addr) := _.
+Proof.
+Admitted.
+

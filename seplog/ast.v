@@ -18,12 +18,15 @@ Require Import msl.eq_dec.
  * abstract syntax the code is written in
  *)
 
+(* types are the types of values we can touch directly *)
 Inductive type :=
-| t_nat
-| t_bool
+| t_unit : type
+| t_nat  : type
+| t_bool : type
+| t_pair : type -> type -> type
+| t_list : type -> type
 | t_addr : type -> type
 | t_lock : type -> type
-| t_list : type -> type
 .
 
 Definition var := (nat * type)%type.
@@ -31,11 +34,13 @@ Definition var := (nat * type)%type.
 Definition addr := (nat * bool * type)%type.
 
 Inductive value : Type :=
+| v_unit
 | v_nat (n:nat)
 | v_bool (b:bool)
+| v_pair (a:value) (b:value)
+| v_list (l:type * (list value))
 | v_addr (a:addr)
 | v_lock (a:addr)
-| v_list (l:type * (list value))
 | v_undef
 .
 

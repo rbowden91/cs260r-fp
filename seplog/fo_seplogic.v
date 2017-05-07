@@ -113,11 +113,13 @@ Function eval_expr (e : expr) (env : env) : value :=
 
 Definition typeof_val (v : value) (t : type) : Prop :=
   match v with
+  | v_unit => t_unit = t
   | v_nat _ => t_nat = t
   | v_bool _ => t_bool = t
-  | v_lock (_,_,t') => t_lock t' = t
-  | v_addr (_,_,t') => t_addr t' = t
+  | v_pair _ _ => False (* XXX notyet *)
   | v_list t' => t_list t = t
+  | v_addr (_,_,t') => t_addr t' = t
+  | v_lock (_,_,t') => t_lock t' = t
   | v_undef => False
   end.
 

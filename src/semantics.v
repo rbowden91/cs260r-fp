@@ -88,11 +88,11 @@ Section Statements.
 
 (* call, return, and start appear at higher levels *)
 Inductive StmtSteps: Heap -> Locals -> stmt -> Heap -> Locals -> stmt -> Prop :=
-| step_in_block: forall h loc s h' loc' s' more,
-     StmtSteps h loc s h' loc' s' ->
-     StmtSteps h loc (s_block (s :: more)) h' loc' (s_block (s' :: more))
-| step_next: forall h loc more,
-     StmtSteps h loc (s_block (s_skip :: more)) h loc (s_block more)
+| step_in_seq: forall h loc s1 s2 h' loc' s1',
+     StmtSteps h loc s1 h' loc' s1' ->
+     StmtSteps h loc (s_seq s1 s2) h' loc' (s_seq s1' s2)
+| step_next: forall h loc s2,
+     StmtSteps h loc (s_seq s_skip s2) h loc s2
 | step_assign: forall h loc id type e a,
      ExprYields type loc e a ->
      StmtSteps h loc (s_assign (mkvar type id) e) h (NatMap.add id (mkval type a) loc) s_skip
@@ -120,7 +120,7 @@ Inductive StmtSteps: Heap -> Locals -> stmt -> Heap -> Locals -> stmt -> Prop :=
 | step_while_true: forall h loc e body,
      ExprYields t_bool loc e v_true ->
      StmtSteps h loc (s_while e body)
-               h loc (s_block [s_scope body; s_while e body])
+               h loc (s_seq (s_scope body) (s_while e body))
 | step_while_false: forall h loc e body,
      ExprYields t_bool loc e v_false ->
      StmtSteps h loc (s_while e body) h loc s_skip
@@ -167,7 +167,7 @@ Inductive ThreadSteps: Heap -> Thread -> Heap -> Thread -> Prop :=
 			loc
 			stk
 			(s_call (mkvar rt retid)
-				(mkproc (mkvar pt paramid) body rt)
+				(mkproc rt (mkvar pt paramid) body)
 				arg)
 		 )
 		 h (thread
@@ -186,7 +186,7 @@ Inductive ThreadStepsStart: Thread -> Thread -> Thread -> Prop :=
 | thread_steps_start: forall loc stk pt paramid body arg argval,
      ExprYields pt loc arg argval ->
      ThreadStepsStart
-	(thread loc stk (s_start (mkproc (mkvar pt paramid) body t_unit) arg))
+	(thread loc stk (s_start (mkproc t_unit (mkvar pt paramid) body) arg))
         (thread loc stk s_skip)
 	(thread (NatMap.add paramid (mkval pt argval) (NatMap.empty val)) stack_empty body)
 .

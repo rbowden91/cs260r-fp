@@ -102,7 +102,7 @@ with
  * procs both take and produce values
  *)
 (*Inductive*) proc: Type :=
-| mkproc: forall (pt rt : type), var -> stmt -> proc (* XXX remove pt rt *)
+| mkproc: var -> stmt -> type -> proc
 .
 
 

@@ -107,7 +107,7 @@ Proof.
   intros.
   induction H1.
   - split.
-    + assert (localenv_sound loc' s').
+    + assert (localenv_sound loc' s1').
       {
         apply IHStmtSteps.
         * unfold localenv_sound.
@@ -196,8 +196,7 @@ Proof.
       * specialize (H0 t name).
         apply svrt_scope.
         inversion H0; auto.
-      * constructor; eauto.
-        constructor.
+      * auto.
   - split.
     + unfold localenv_sound.
       eauto.
@@ -394,8 +393,7 @@ Proof.
     split; auto.
     apply vars_scoped_block_cons with (env' := tyenv2).
     * apply vars_scoped_scope with (env' := env'body); auto.
-    * apply vars_scoped_block_cons with (env' := tyenv2); auto.
-      apply vars_scoped_block_nil.
+    * auto.
   - exists tyenv2.
     inversion H1; subst.
     split; auto.
@@ -540,9 +538,8 @@ Lemma StmtStepsProgress_new:
 Proof.
   intros tyenv tyenv2 h l s; revert tyenv tyenv2 h l.
   induction s; intros.
-  - destruct l.
-    * unfold s_skip; contradiction.
-    * admit.
+  - contradiction.
+  - admit.
   - specialize (H2 p e). contradiction.
   - inversion H; subst.
     apply ExprStepsProgress_new with (l := l) in H8; auto.

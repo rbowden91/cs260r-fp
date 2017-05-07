@@ -220,7 +220,7 @@ Inductive hoare_stmt :
 
 | ht_return : forall retC ret lk_invs,
               forall e PC P,
-              (forall rho, PC rho |-- retC (eval_expr e rho)) ->
+              (forall rho, retC (eval_expr e rho) |-- PC rho) ->
               (forall rho, P rho |-- ret (eval_expr e rho)) ->
               hoare_stmt retC ret lk_invs
                          PC P (s_return e) ETT EFF

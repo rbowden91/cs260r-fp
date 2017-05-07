@@ -8,18 +8,24 @@
 Proving the functional correctness of file systems is critical to ensuring data
 integrity of higher level user applications. Bugs are regularly found in
 commonly-used file systems, which can lead to data
-corruption.\cite{yang2006explode} While formal verification is already a
-nontrivial task for most systems\footnote{Insert obligatory ``seL4 took
-\textit{twenty person years}!!!'' comment.}, file systems have the added
+corruption.\cite{yang2006explode}
+While formal verification is already a
+nontrivial task for most systems
+\footnote{Insert obligatory ``seL4 took
+\textit{twenty person years}!!!'' comment.},
+file systems have the added
 difficulty of needing to maintain consistent states, even in the face of
-crashes. Strategies like soft updates and write-ahead logging can be used to
+crashes.
+Strategies like soft updates and write-ahead logging can be used to
 protect against data loss and corruption, but bugs can and have resulted in
 violating necessary invariants of these strategies.
 
 In the case of file systems, examples of a source of a crash include power loss
-or a kernel panic. After a crash, recovery can only act on the post-crash
+or a kernel panic.
+After a crash, recovery can only act on the post-crash
 durable disk state; all volatile state (including data in the buffer and disk
-cache) is lost. However, we can extend the notion of a ``crash'' to more
+cache) is lost.
+However, we can extend the notion of a ``crash'' to more
 generally describe any possible break in the normal control flow of a program.
 It is possible to reason about both durable and volatile state correctness in
 the presence of things like signals, exceptions, and interrupts in the same way
@@ -29,34 +35,45 @@ or kernel panics.
 Several file systems have been formally verified as crash-safe, which typically
 involves reasoning about a potential crash at all possible steps of execution.
 In verifying FSCQ, one such verified file system, Chen et al.\ developed crash
-Hoare logic to facilitate such reasoning\cite{chen2015using}. However, to date,
+Hoare logic to facilitate such reasoning\cite{chen2015using}.
+However, to date,
 no formally verified file system has been able to handle multiple concurrent
 file system write operations.
 
 The contribution of this work is to first extend crash Hoare logic into
 \textit{concurrent} crash Hoare logic, to allow for reasoning about concurrent
 operations even in the face of crashes, and to take first steps at proving the
-logic sound. Then, having proven it sound, we intend to use the concurrent
+logic sound.
+Then, having proven it sound, we intend to use the concurrent
 crash Hoare logic to build a fully concurrent file system.
 
 \section{Related Work}
 
 \subsection{Separation logic}
 Separation logic\cite{reynolds2002separation} introduced an intuitive way to
-\textit{locally reason} about programs that modify the heap. The heap is a
-mapping from addresses to values. A judgement on the heap takes the form
-$h \vDash P$. The judgement holds if $h$ satisfies the assertion $P$. An
+\textit{locally reason} about programs that modify the heap.
+The heap is a
+mapping from addresses to values.
+A judgement on the heap takes the form
+$h \vDash P$.
+The judgement holds if $h$ satisfies the assertion $P$.
+An
 example assertion is $10 \mapsto 20$, which asserts that address $10$ contains
 (maps to) $20$ (in other words, $h(10) = 20$).
 
-In the classical formulation\footnote{In the intuitionistic formulation,
+In the classical formulation
+\footnote{In the intuitionistic formulation,
 satisfying $P$ means $h$ is a superset of the heap described by $P$, as opposed
-to exactly that heap. This is useful for reasoning about programs that have
-automatic garbage collection as opposed to manual memory management.}, the
+to exactly that heap.
+This is useful for reasoning about programs that have
+automatic garbage collection as opposed to manual memory management.},
+the
 assertion $P$ is only true if $h$ is \textit{exactly} the heap described by P,
-and nothing more. We have a binary separating conjunction operator ($\ast$) and
+and nothing more.
+We have a binary separating conjunction operator ($\ast$) and
 a unit $emp$ (which describes the empty heap) with the following
-properties\footnote{Separation logic also has separating implication operator
+properties
+\footnote{Separation logic also has separating implication operator
 ($-\!\!\ast$), but our logic does not make use of it.}:
 
 \[
@@ -94,8 +111,10 @@ back in after the procedure call.
 \subsection{Concurrent Separation Logic}
 
 The ability to reason locally about the heap naturally led to attempting to
-reason about shared state in concurrent programs. This gave rise to concurrent
-separation logic\cite{o2007resources}. Given a binary operator $C_1 || C_2$ that
+reason about shared state in concurrent programs.
+This gave rise to concurrent
+separation logic\cite{o2007resources}.
+Given a binary operator $C_1 || C_2$ that
 runs commands $C_1$ and $C_2$ in parallel, we have the rule:
 
 \[
@@ -104,16 +123,20 @@ runs commands $C_1$ and $C_2$ in parallel, we have the rule:
 \]
 
 $C_1$ and $C_2$ running concurrently must not have any data races, since their
-``heaplets'' do not overlap. However, this alone cannot be used to model
+``heaplets'' do not overlap.
+However, this alone cannot be used to model
 programs that share state.
 
 The original concurrent separation logic had an atomic \textit{with r when b do
 c} control flow operator (and associated logic rule) that ran command $c$
 atomically with an implicit lock associated with $r$ effecitvely spinning on
-condition $b$. Instead, we model locks explicitly, as was done in work trying
+condition $b$.
+Instead, we model locks explicitly, as was done in work trying
 to formulate a concurrent separation logic for the C
-language.\cite{hobor2008oracle} As such, we have rules for both acquiring and
-releasing a lock. Loosely, the rules look like:
+language. \cite{hobor2008oracle}
+As such, we have rules for both acquiring and
+releasing a lock.
+Loosely, the rules look like:
 
 \begin{align*}
     \infer{\hoaretrip{\ell \mapsto R}{\texttt{getlock}(\ell)}{(\ell \mapsto R) *
@@ -121,31 +144,41 @@ releasing a lock. Loosely, the rules look like:
     \infer{\hoaretrip{(\ell \mapsto R) * R}{\texttt{putlock}(\ell)}{\ell \mapsto R}}{}
 \end{align*}
 
-Here, $R$ represents an assertion (a ``predicate on the heap''). There is
+Here, $R$ represents an assertion (a ``predicate on the heap'').
+There is
 messiness with what exactly it means for a predicate (something meant to be
-discussed only by the logic) to live in the heap.\footnote{Our logic currently
-avoids doing this by not allowing for dynamic lock creation and deletion.} But
+discussed only by the logic) to live in the heap.
+\footnote{Our logic currently
+avoids doing this by not allowing for dynamic lock creation and
+deletion.}
+But
 that issue aside, intuitively, acquiring a lock allows us to access new heap
 addresses referenced in $R$ that the lock was protecting.
 
 For example, $R$ might look like $\exists x, 10\mapsto x \wedge
-\texttt{isEven}(x)$.  After acquiring the lock, we now can read address $10$.
+\texttt{isEven}(x)$.
+After acquiring the lock, we now can read address $10$.
 We do not know what $x$ is until we actually perform the read, but we do know
-that it is even.\footnote{This is all the information we will ever have when
+that it is even.
+\footnote{This is all the information we will ever have when
 trying to prove something in the logic, since we cannot directly read the
-address to get a concrete value in the logic.} Importantly, when we try to
+address to get a concrete value in the logic.}
+Importantly, when we try to
 release the lock, we have to be sure that $x$ is once again even, or else we do
-not meet the pre-condition of putlock, which includes $R$. In between the calls
+not meet the pre-condition of putlock, which includes $R$.
+In between the calls
 to getlock and putlock, $x$ may point to an arbitrary value, as long as it is
 even when putlock is called.
 
 \subsection{Other Logics}
 
 In parallel with concurrent separation logic, other methods arose to
-reason about concurrent programs. For example,
+reason about concurrent programs.
+For example,
 rely-guarantee\cite{jones1981development} explicitly models interference
 (whereas concurrent separation logic is premised on the assumption that most
-programs rarely interfere). The Views metaframework\cite{dinsdale2013views} is a
+programs rarely interfere).
+The Views metaframework\cite{dinsdale2013views} is a
 general framework that can be used to prove the soundness of various
 compositional reasoning strategies for concurrent programs, and has been shown
 to generalize both rely-guarantee and concurrent separation logic.
@@ -154,34 +187,42 @@ Most similar to our own efforts, Ntzik et al.\ extend the Views framework to
 allow for concurrent fault-tolerant resource reasoning\cite{ntzik2015fault}.
 They split pre-conditions and post-conditions into separate volatile
 (memory-related) and durable (disk-related) conditions, with separate,
-frame-rulable crash invariants. They use their logic to reason about
-ARIES\cite{ntzik2015fault}, a write-ahead logging recovery algorithm. However,
+frame-rulable crash invariants.
+They use their logic to reason about
+ARIES\cite{ntzik2015fault}, a write-ahead logging recovery algorithm.
+However,
 their logic rules differ from our own, and they do not demonstrate an actual
-implementation of their logic or proofs in code. We are interested in the
+implementation of their logic or proofs in code.
+We are interested in the
 relationship between our own concurrent crash Hoare logic and their
 fault-tolerant resource reasoning.
 
 The Verified Software Toolchain\cite{appel2014program} is an ongoing effort to
 allow for functional verification of real C code in Coq that can be immediately
 compiled by the CompCert\cite{leroy2009formal} verified C compiler to machine
-code. While their separation logic framework has been used to prove relatively
+code.
+While their separation logic framework has been used to prove relatively
 substantial programs written in C, their fledgling concurrent separation logic
 does not yet allow for reasoning about something as complex as a file system.
 Our concurrent separation logic does not need to concern itself with the full
 semantics of the (supported subset of) the C language, nor does it need to
-adhere to any pre-existing semantics as VST must do to CompCert. Nevertheless,
+adhere to any pre-existing semantics as VST must do to CompCert.
+Nevertheless,
 the implementation of our logic is able to directly use much of VST's underlying
 separation algebra machinery.
 
 In extending a file system to allow for concurrency and buffered writes, we run
 into a fundamental issue with concurrent separation logic: one is able to
 relatively easily prove that the program is data-race free, but one loses the
-ability to easily discuss functional correctness. With multiple concurrent and
+ability to easily discuss functional correctness.
+With multiple concurrent and
 buffered writes, one can no longer easily express facts about the state of the
-file system before and after a given call to write. Blom et al.\ argue that
+file system before and after a given call to write.
+Blom et al.\ argue that
 this problem may be handled with the use of traces\cite{blom2015history}, in a
 manner similar to how distributed systems implemented using the Verdi framework
-prove functional correctness.\cite{wilcox2015verdi} This is the approach that
+prove functional correctness. \cite{wilcox2015verdi}
+This is the approach that
 VST is following in the beginnings of their concurrent separation logic, and it
 is the one we take in our specifications.
 
@@ -190,17 +231,21 @@ is the one we take in our specifications.
 
 Crash Hoare logic\cite{chen2015using} is an extension of Hoare logic that, in
 addition to the regular pre- and post-conditions, has an additional crash
-condition that must hold \textit{at every step} of the execution. If a given
+condition that must hold \textit{at every step} of the execution.
+If a given
 procedure satisfies some crash condition $C$, then in the event of a crash, we
 are guaranteed that $C$ accurately describes the state of the world just before
-the crash. Crash Hoare logic is used in proving the FSCQ\cite{chen2015using}
+the crash.
+Crash Hoare logic is used in proving the FSCQ\cite{chen2015using}
 file system correct.
 
 \subsection{Verified File Systems}
 FSCQ\cite{chen2015using}, written in the Coq proof assistant, is the first file
 system proven to meet a specification that includes crashes, using the
-aforementioned crash Hoare logic. The logic makes use of separation logic to
-ensure that procedures modify only the intended data. Using the separating
+aforementioned crash Hoare logic.
+The logic makes use of separation logic to
+ensure that procedures modify only the intended data.
+Using the separating
 conjunction ($\ast$), a specification for the writeblock call can be written
 along the lines of:
 
@@ -212,43 +257,57 @@ along the lines of:
 \end{align*}
 
 In the above, the appearance of $\ast otherblocks$ on both sides of the Hoare
-triple indicates that the write does not touch the other blocks on disk. Without
+triple indicates that the write does not touch the other blocks on
+disk.
+Without
 separation logic, a write call could theoretically be allowed to zero out all
 other blocks on disk and just not mention that fact in its Hoare triple.
 
 Our work is directly inspired by FSCQ's use of crash Hoare logic, but there are
-three issues with FSCQ that we aim to fix. First, it does not support full
-concurrency. Chajed\cite{chajed2017verifying} extends FSCQ to allow for
+three issues with FSCQ that we aim to fix.
+First, it does not support full
+concurrency.
+Chajed \cite{chajed2017verifying} extends FSCQ to allow for
 asynchronous reads: if a file system call needs to read from disk, it issues the
 read and restarts the entire call, allowing another file system call to proceed
-while the first waits for the disk read to complete. However, efforts to extend
+while the first waits for the disk read to complete.
+However, efforts to extend
 FSCQ to fully concurrent file system calls seem to require fundamental changes
 to the infrastructure.
 
 Second, every write operation to disk requires an explicit disk sync before
-returning.\footnote{In fact, it requires four separate syncs before returning.}
+returning.
+\footnote{In fact, it requires four separate syncs before returning.}
 Writes are not buffered in memory, and the post-condition of a write call would
 not be able to state anything about the disk containing new data without a sync.
 
 Finally, related strictly to the logic (and not a restriction on the actual
 implementation), the specification does not seem to be able to make full use of
-the power of separation logic. In the specification for \texttt{writeblock}
+the power of separation logic.
+In the specification for \texttt{writeblock}
 above, usually separation logic would allow for leaving out $\ast otherblocks$
 from the pre- and post-conditions, and it would be up to a caller to frame it
-out before making the call. Our logic aims to fix these three concerns.
+out before making the call.
+Our logic aims to fix these three concerns.
 
 Other verified file systems suffer from similar deficiencies, especially with
-respect to concurrency. Cogent\cite{amani2016cogent} is a domain-specific
+respect to concurrency.
+Cogent\cite{amani2016cogent} is a domain-specific
 language that certifiably compiles to C, which can be further compiled to
-machine code by CompCert. Proofs in Cogent are at a higher level than low-level
-C code, and thus the verification burden is lowered. Cogent is used to prove
+machine code by CompCert.
+Proofs in Cogent are at a higher level than low-level
+C code, and thus the verification burden is lowered.
+Cogent is used to prove
 (subsets of) two Linux file systems, BilbyFS and ext2, rewritten in the
-language. However, Cogent only allows for a sequential semantics, and thus only
+language.
+However, Cogent only allows for a sequential semantics, and thus only
 supports asynchronous I/O but not full concurrency.
 
 Yggdrasil\cite{sigurbjarnarson2016push} is similarly a higher-level toolkit for
-implementing file systems based on crash refinement. It uses Z3 as its underlying
-verifier, removing most of the proof burden from the developer. Again, file
+implementing file systems based on crash refinement.
+It uses Z3 as its underlying
+verifier, removing most of the proof burden from the developer.
+Again, file
 systems implemented using Yggdrasil are limited to single-threaded code.
 
 % Flashix??
@@ -258,7 +317,8 @@ systems implemented using Yggdrasil are limited to single-threaded code.
 \subsection{Language}
 
 A single ``step'' in the execution of FSCQ proceeds from one disk operation
-(read, write, sync, or trim) to the next. Everything in between disk operations
+(read, write, sync, or trim) to the next.
+Everything in between disk operations
 is pure functional Coq code, since in FSCQ, crash conditions only need to
 describe disk state anyway, and recovery code can only reason about disk state.
 In their ongoing efforts at a concurrent separation logic, Chen et al.\ have
@@ -268,15 +328,21 @@ trim).
 Because the write-ahead logging invariant depends on the contents of memory as
 much as it depends on disk (in-memory log entries need to be written out to disk
 before the relevant in-memory buffers), we need, in addition to lock acquire and
-release and disk read and write operations, heap load and store operations. More
+release and disk read and write operations, heap load and store
+operations.
+More
 generally, the language needs to support atomic steps for whatever type of
-``crash invariants'' we want to support. As such, we modeled an imperative
+``crash invariants'' we want to support.
+As such, we modeled an imperative
 language with pure expressions, conditions, loops, procedure calls, local
 variable and shared heap manipulation, lock operations, and thread
-spawning.\footnote{See the full language in the appendix. It is possible that,
+spawning.
+\footnote{See the full language in the appendix.
+It is possible that,
 strictly for the purposes of verifying a file system like FSCQ, we could have
 gotten away with just adding heap manipulation and lock operations, performing
-everything in-between in pure Coq. We are not sure of this, and it was a
+everything in-between in pure Coq.
+We are not sure of this, and it was a
 realization that came about only in finalizing corner cases of the logic in the
 imperative language.}
 
@@ -289,9 +355,11 @@ imperative language.}
 
 \subsubsection{Notation}
 Because the language is imperative, we are able to take some inspiration from
-the Verified Software Toolchain for the Hoare logic rules. On the one hand, we
+the Verified Software Toolchain for the Hoare logic rules.
+On the one hand, we
 are able to simplify, since we do not have to support the broader C semantics
-that VST does. On the other, we need to extend the logic to support both
+that VST does.
+On the other, we need to extend the logic to support both
 concurrency and crash conditions.
 
 A Hoare judgement for a statement of our language is a septuple of the form:
@@ -299,18 +367,26 @@ A Hoare judgement for a statement of our language is a septuple of the form:
 $$\hoarestmt{(R^c,R^r)}{(L^c,L^r)}{CP}{P}{s}{Q}{CQ}$$
 
 $P$ and $Q$ are the pre- and post-conditions, respectively, of the statement
-$s$, as in traditional Hoare logic. $CP$ and $CQ$, on the other hand, are the
-crash pre-condition and crash post-condition.\footnote{Calling it the ``crash
+$s$, as in traditional Hoare logic.
+$CP$ and $CQ$, on the other hand, are the
+crash pre-condition and crash post-condition.
+\footnote{Calling it the ``crash
 post-condition'' seems to imply that that is the state of the world after a
-crash, but that is not right. Nevertheless, its what we have become accustomed
-to calling it, as it is analogous to FSCQ's single crash condition.} The crash
+crash, but that is not right.
+Nevertheless, its what we have become accustomed
+to calling it, as it is analogous to FSCQ's single crash condition.}
+The crash
 pre-condition and crash post-condition are really statements about invariants.
 The crash pre-condition states that every step taken in $s$ respects the
-invariants specified in $CP$. The crash post-condition states that, after $s$
+invariants specified in $CP$.
+The crash post-condition states that, after $s$
 completes, future steps of the program must continue to abide by the invariants
-in $CQ$. Importantly, $CP$ and $CQ$ \textit{do not} have to be the same; $s$
-can modify them. $(L^c,L^r)$ and $(R^c,R^r)$ are described in the Lock rules
-and Return rule subsection, respectively. We will denote them with the
+in $CQ$.
+Importantly, $CP$ and $CQ$ \textit{do not} have to be the same; $s$
+can modify them.
+$(L^c,L^r)$ and $(R^c,R^r)$ are described in the Lock rules
+and Return rule subsection, respectively.
+We will denote them with the
 contracted notation $L$ and $R$ when the components are not being discussed.
 
 \subsubsection{Lock rules}
@@ -324,16 +400,21 @@ take invariants \textit{away}.
 
 As described in regular concurrent separation logic, acquiring a lock can pull a
 resource invariant into the pre-condition of a statement, and releasing a lock
-can pull a resource invariant out of the post-condition. Analogously, we model
+can pull a resource invariant out of the post-condition.
+Analogously, we model
 lock acquisition to pull a separate resource invariant into the crash
 pre-condition and lock release to pull it out of the crash post-condition.
 
 We call the resource invariant pulled into the regular pre- and post-conditions
-a \textit{weak invariant}. The invariant only needs to hold at the time the lock
-is acquired and when it is released. In between lock acquisition and release,
-the invariant may be violated. We call the (possibly different) resource
+a \textit{weak invariant}.
+The invariant only needs to hold at the time the lock
+is acquired and when it is released.
+In between lock acquisition and release,
+the invariant may be violated.
+We call the (possibly different) resource
 invariant pulled into the crash pre- and post-conditions a \textit{strong
-invariant}. The invariant must be true at the time the lock is acquired; it must
+invariant}.
+The invariant must be true at the time the lock is acquired; it must
 be true at the time the lock is released; and it must remain true at each step
 of execution in between the acquisition and release.
 
@@ -341,9 +422,12 @@ In the Hoare septuple above, $L^c$ is a map from a lock to its associated strong
 invariant that is pulled into and out of the crash pre-condition and
 post-condition, and $L^r$ is the traditional map from a lock to its associated
 weak invariant that is pulled into and out of the regular pre-condition and
-post-condition. Given all this, the rules for lock acquisition and release
-become what is written in Figure~\ref{fig:locks}.\footnote{Notice that we avoid
-having to discuss the storage of invariants in the heap. Instead, analogously
+post-condition.
+Given all this, the rules for lock acquisition and release
+become what is written in Figure~\ref{fig:locks}.
+\footnote{Notice that we avoid
+having to discuss the storage of invariants in the heap.
+Instead, analogously
 to locks in C, we just need to have a pointer to the lock in our heap in order
 to acquire and release it.}
 
@@ -370,9 +454,11 @@ pre- and post-conditions before calling $\texttt{getlock}(\ell_2)$.
 Unfortunately, it cannot be as general as the original frame rule of separation
 logic: here, to frame constraints out of the crash pre- and post-conditions, we
 must also frame knowledge of the constrained portions of the heap out of the
-regular pre- and post-conditions. Otherwise, we could frame out a strong
+regular pre- and post-conditions.
+Otherwise, we could frame out a strong
 invariant and retain the ability to modify the heap in a way that violates the
-strong invariant. As such, the additional frame rule carries some restrictions,
+strong invariant.
+As such, the additional frame rule carries some restrictions,
 as seen in Figure~\ref{fig:stronginv}.
 
 \begin{figure*}
@@ -387,56 +473,73 @@ as seen in Figure~\ref{fig:stronginv}.
 
 Intuitively, if statement $s$ does not rely in any way whatsoever on lock $\ell$
 in order to execute, then we can completely frame everything related to it out
-of existence (including the lock itself). $s$ cannot possibly violate constraint
+of existence (including the lock itself).
+$s$ cannot possibly violate constraint
 $L^c(\ell)$, because everything that the acquisition of $\ell$ pulled in has
-been framed out.\footnote{Note that this implies a constraint on the possible
+been framed out.
+\footnote{Note that this implies a constraint on the possible
 dynamic crash conditions that we can support: a crash condition should
-\textit{only} constrain the use of the resource that the lock protects. It does
+\textit{only} constrain the use of the resource that the lock
+protects.
+It does
 not make sense for the acquisition of a lock to insert a strong invariant about
 some global variable not protected by that lock, since any thread is in danger
-of breaking that invariant when not holding the lock. Furthermore, it is
+of breaking that invariant when not holding the lock.
+Furthermore, it is
 frustrating that we have to specify the mapping of the lock in the crash
-conditions. This would appear to imply that this must \textit{always} be the
-mapping of the lock. We could just indicate that there exists some mapping
+conditions.
+This would appear to imply that this must \textit{always} be the
+mapping of the lock.
+We could just indicate that there exists some mapping
 for the lock, but that would still imply that the lock is always allocated.
 This is fine in our current world where we do not have dynamic memory or lock
-operations, but is an issue once those are added into the language. See the
+operations, but is an issue once those are added into the language.
+See the
 future work section for a discussion on our proposed solution to this issue.}
 % another wording than the ``mapping of the lock'' perhaps
 
-A more granular rule is expected to remain sound. A strong invariant cannot be
+A more granular rule is expected to remain sound.
+A strong invariant cannot be
 violated as long as the resource it constrains is removed from the weak
-invariant. Then, as long as we simultaneously frame the same referenced
+invariant.
+Then, as long as we simultaneously frame the same referenced
 addresses and all constraints on those addresses out of both the crash and
 regular conditions, we do not need to frame \textit{everything} related to the
-lock out at once. With this, we can combine the two frame rules into one, as
+lock out at once.
+With this, we can combine the two frame rules into one, as
 seen in Figure~\ref{fig:altframe}.
 
 %If a mapping is only
 %mentioned in the weak invariant $L^r(\ell)$, we should not need to frame it out
 %of the regular conditions in order to remove $L^c(\ell)$ from the crash
-%conditions. Furthermore, when framing out $L^c(\ell)$, any resource mentioned in
+%conditions.
+%Furthermore, when framing out $L^c(\ell)$, any resource mentioned in
 %both $L^c(\ell)$ and $L^r(\ell)$ can just be downgraded to \textit{read-only} in
 %$L^r(\ell)$, so that the resource cannot be changed to violate the constraint.
 %With this, we can combine the two frame rules into one, as seen in
-%Figure~\ref{fig:altframe}.\footnote{We use the notation seen in permission
+%Figure~\ref{fig:altframe}.
+%\footnote{We use the notation seen in permission
 %separation logics, where $a\overset{\pi}{\mapsto}\texttt{?}$ indicates a
 %partial, read-only permission to address $a$, and
 %$a\overset{\bullet}{\mapsto}\texttt{?}$ indicates a full, write permission to
 %address $a$.}
 
 There is one important thing that the weaker (more granular) rule handles that
-the stronger rule cannot. Consider an example of a lock $\ell_1$ protecting a
+the stronger rule cannot.
+Consider an example of a lock $\ell_1$ protecting a
 structure that contains another lock $\ell_2$ (for example, in a linked list
-hand-over-hand lock coupling program). The crash pre-condition of
+hand-over-hand lock coupling program).
+The crash pre-condition of
 $\texttt{getlock}(\ell_2)$ requires everything related to $\ell_1$ to have been
-framed out. But the mapping $a_2\mapsto\ell_2$, which is a part of the
+framed out.
+But the mapping $a_2\mapsto\ell_2$, which is a part of the
 statement's pre-condition, is itself a resource in the invariants of $\ell_1$!
 The weaker frame rule would allow for removal of all \textit{other} resources
 and constraints, which still allows for acquisition of the lock.
 
 We intend to switch to (a form of) the alternative frame rule, but we currently
-have implemented the two separate frame rules. See the future work discussion
+have implemented the two separate frame rules.
+See the future work discussion
 for why the frame rule (and more fundamentally the shape of our Hoare triple)
 might still change further, whereas we expect (but have not yet proven) that
 our two current frame rules are sound.
@@ -453,24 +556,32 @@ our two current frame rules are sound.
 \end{figure*}
 
 %However, the current rule makes sense from a design
-%perspective. With this rule, all procedures must be explicit about which locks
-%they ever use, and analyzing the uld generally suffice. If a mapping is only
+%perspective.
+%With this rule, all procedures must be explicit about which locks
+%they ever use, and analyzing the uld generally suffice.
+%If a mapping is only
 %mentioned in the weak invariant $L^r(\ell)$, we should not need to remove it
 %from the regular pre-condition in order to remove $L^c(\ell)$ from the crash
-%conditions. However, the current rule makes sense from a design
-%perspective. With this rule, all procedures must be explicit about which locks
+%conditions.
+%However, the current rule makes sense from a design
+%perspective.
+%With this rule, all procedures must be explicit about which locks
 %they will ever use (which includes just touching resources belonging to the
 %locks), whether they expect them to be held or not held at the time of
 %acquisition, and whether they return with the lock held or not
-%held.\footnote{Technically, we can only tell these things if the lock has an
-%associated strong invariant. However, the pre-condition can still be written
+%held.
+%\footnote{Technically, we can only tell these things if the lock has an
+%associated strong invariant.
+%However, the pre-condition can still be written
 %explicitly in terms of $L^c(\ell)$, even if that evaluates to $emp$, which
-%indicates whether the procedure expects the lock to be held. Similarly, we
+%indicates whether the procedure expects the lock to be held.
+%Similarly, we
 %could force every lock to automatically have \textit{some} strong invariant,
 %perhaps related to the mapping $a\mapsto\ell$}
 %
 %Also, notice that the logic will not let us acquire a lock twice, unlike regular
-%concurrent separation logic.\footnote{As in the above, this currently depends on
+%concurrent separation logic.
+%\footnote{As in the above, this currently depends on
 %a strong lock invariant existing.}
 
 \subsubsection{Rule of consequence}
@@ -481,20 +592,28 @@ our two current frame rules are sound.
 Ignoring separation logic and crash post-conditions for a moment, if we
 currently have crash pre-condition $CP'=A \wedge B$, under what circumstances
 can we execute a statement $s$ with pre-condition $CP$? We can clearly do so if
-$CP=CP'$. What if $CP=A$? Then statement $s$ does not adhere to invariant $B$,
-and we cannot execute it. On the other hand, if $CP=A \wedge B \wedge C$, then
-$s$ adheres to a superset of the invariants that we need, and we can proceed. In
+$CP=CP'$.
+What if $CP=A$? Then statement $s$ does not adhere to invariant $B$,
+and we cannot execute it.
+On the other hand, if $CP=A \wedge B \wedge C$, then
+$s$ adheres to a superset of the invariants that we need, and we can
+proceed.
+In
 general, we can execute $s$ if $CP \imp CP'$.
 
 Now focusing on crash post-conditions, we have crash post-condition $Q'=A \wedge
-B$, and statement $s$ has crash post-condition $Q$. If $Q=A \wedge B \wedge C$,
+B$, and statement $s$ has crash post-condition $Q$.
+If $Q=A \wedge B \wedge C$,
 then $s$ requires that future steps adhere to $C$, which we do not promise to
-adhere to. On the other hand, if $Q=A$, then $s$ requires that all future steps
+adhere to.
+On the other hand, if $Q=A$, then $s$ requires that all future steps
 adhere only to $A$, which is a subset of what we already intended to adhere to
-after this step. In general, we can execute $s$ if $CQ \imp CQ'$.
+after this step.
+In general, we can execute $s$ if $CQ \imp CQ'$.
 
 The full rule of consequence, combined with that of traditional Hoare logic, is
-as shown in Figure~\ref{fig:consequence}. Interestingly, the implications in
+as shown in Figure~\ref{fig:consequence}.
+Interestingly, the implications in
 the crash rules are the \textit{converse} of the implications in the traditional
 rules!
 
@@ -510,7 +629,8 @@ rules!
 
 In traditional Hoare logic, a Hoare triple cannot be established for a sequence
 where the second statement has a pre-condition of False (unless the first
-statement was able to establish a post-condition of False). Similarly, having
+statement was able to establish a post-condition of False).
+Similarly, having
 proven a Hoare triple with a post-condition of False means we can sequence with
 a statement that has any other pre-condition (and thus prove anything), because
 we can use the rule of consequence to change the post-condition to match
@@ -519,20 +639,24 @@ whatever pre-condition we like.
 What does it mean for a statement's crash pre-condition to be True? By the rule
 of consequence, it means we cannot establish a Hoare septuple for a sequence
 to this statement (unless the current crash post-condition happens to also be
-True). Similarly, a crash pre-condition of True may be established for any
+True).
+Similarly, a crash pre-condition of True may be established for any
 statement, since any statement's more precise crash pre-condition may imply
-True. Intuitively, a True crash pre-condition releases the Hoare septuple's
+True.
+Intuitively, a True crash pre-condition releases the Hoare septuple's
 statement from adhering to \textit{any} invariants; a Hoare septuple with a
 True crash pre-condition does not claim the statement adheres to any invariant.
 
 By similar reasoning, if a statement's crash pre-condition is False, then it
-supports \textit{all} possible invariants. For example, an operation that does
+supports \textit{all} possible invariants.
+For example, an operation that does
 not modify any state can have a crash pre-condition of False.
 
 If a statement's crash pre-condition is $emp$, then that asserts and requires
 that its heap is permanently empty (the only way we could add something to the
 heap is by acquiring a lock, which would require having access to something on
-the heap in the first place). This could be useful for specifying completely
+the heap in the first place).
+This could be useful for specifying completely
 pure functions that do not touch the heap.
 
 On the other side of the septuple, what about the crash post-condition
@@ -548,12 +672,14 @@ never execute another statement (unless the next statement's crash
 post-condition is also False).
 
 Finally, if the statement's crash post-condition is $emp$, the heap must remain
-empty after the statement returns. This is not strictly permanent, though,
+empty after the statement returns.
+This is not strictly permanent, though,
 since we could always have framed out part of the heap prior to executing the
 statement, and frame it back in after.
 
 Interestingly, even applying the rule of consequence seems to work in the
-opposite direction for crash conditions. Take the rule for the \texttt{skip}
+opposite direction for crash conditions.
+Take the rule for the \texttt{skip}
 statement as an example:
 
 \begin{gather*}
@@ -572,20 +698,26 @@ described earlier, we can use a crash pre-condition of True to reach any crash
 condition, and a regular pre-condition of False to reach any regular condition.
 
 In this case, we can weaken our regular pre-condtion from False to $Q$
-using the rule of consequence. But to make the crash conditions match, we go in
-the opposite direction. We use the rule of consequence on the crash
-\textit{post-condition} to bring the state from $CQ$ to True. Now we can apply
+using the rule of consequence.
+But to make the crash conditions match, we go in
+the opposite direction.
+We use the rule of consequence on the crash
+\textit{post-condition} to bring the state from $CQ$ to True.
+Now we can apply
 the skip rule with $P=Q$ and $CP=True$, and we are all set.
 
 \subsubsection{Procedure rules}
 
 In our language, a statement can call another procedure and can return from
-within a procedure. Ultimately, a procedure judgement is of roughly the form:
+within a procedure.
+Ultimately, a procedure judgement is of roughly the form:
 $$\hoareproc{L}{CP}{P}{\texttt{proc}(s, e)}{Q}{CQ}$$
 This is to say, a procedure with body $s$ with takes $e$ as an argument must
 satisfy the specified pre- and post-conditions given the (global) lock
-invariants. Notably missing is the return condition, $R$, found in the statement
-judgements. In order to prove the procedure judgement sound, we just need to
+invariants.
+Notably missing is the return condition, $R$, found in the statement
+judgements.
+In order to prove the procedure judgement sound, we just need to
 prove that statement $s$ satisfies:
 \begin{gather*}
 \hoarestmt{(CQ(e),Q(e))}{L}{CP(e)}{P(e)}{s}{False}{True}
@@ -594,7 +726,8 @@ prove that statement $s$ satisfies:
 First, the procedure's conditions are all parameterized by the input argument.
 Second, the procedure's post-conditions are pulled into the \textit{return}
 conditions of the body, the post-condition is False, and the post
-crash-condition is True. False and True enforce that the body must always have a
+crash-condition is True.
+False and True enforce that the body must always have a
 return statement, which, as we will see, is a rule that can satisfy those
 constraints (after hitting a return, we should be able to trivially prove the
 rest of the procedure, which is often just ``skip'').
@@ -607,7 +740,8 @@ The return rule takes the form:
 \end{gather*}
 
 $(R^c,R^r)$ came directly from the crash and regular post-conditions of the
-procedure. They were already parameterized by the input argument, and are now
+procedure.
+They were already parameterized by the input argument, and are now
 further parameterized by the return value (such that the input argument and the
 return value can be related in the pre- and post-conditions for the procedure).
 If the current crash condition implies the procedure's crash post-condition and
@@ -627,9 +761,11 @@ the input argument and the return value.
 % XXX is disk model changing by removing the bool?
 
 Ultimately, the only statement of our language whose corresponding hoare rule
-needs to be checked against the current crash condition is ``store''. In our
+needs to be checked against the current crash condition is ``store''.
+In our
 model, the disk is represented as a parallel version of the heap that can
-ultimately hold arbitrary values. Disk asynchronicity can be represented, for
+ultimately hold arbitrary values.
+Disk asynchronicity can be represented, for
 example, by storing lists at each disk address, where the head of the list gives
 the most recent value written to disk, and the tail represents potential values
 that could appear on disk following a crash if the disk is not explicitly synced.
@@ -651,21 +787,27 @@ Our logic has been formalized in the Coq proof assistant.
 % XXX Lemma about strong invariants always holding??
 
 The final goal is to use our concurrent crash Hoare logic to prove data-race
-freedom and functional correctness of a concurrent crash file system. But first,
+freedom and functional correctness of a concurrent crash file system.
+But first,
 we still need to fully prove the logic sound according to the semantics of our
 imperative language.
 
 That said, our logic and language must be extended in multiple ways to more
-fully model a concurrent file system. First, it is necessary to add in a
-permission model to allow for multiple readers of a heap address.  For file
+fully model a concurrent file system.
+First, it is necessary to add in a
+permission model to allow for multiple readers of a heap address.
+For file
 system purposes, this is strictly necessary in order to reason about multiple
 concurrent threads sharing pointers to the same locks.
 
 Additionally, our language does not currently include any dynamic heap
-allocation, including malloc, free, lock creation, and lock deletion. These are
+allocation, including malloc, free, lock creation, and lock deletion.
+These are
 necessary to be able to correctly model operations such as file system mount and
-unmount. A fundamental issue is that, traditionally, dynamic locks introduce the
-aforementioned issue of ``predicates on the heap''. Once locks are dynamic and
+unmount.
+A fundamental issue is that, traditionally, dynamic locks introduce the
+aforementioned issue of ``predicates on the heap''.
+Once locks are dynamic and
 predicates are placed on the heap, we lose the power to reason about what global
 invariants a program must abide by, and as such can no longer reason about a
 consistent state for recovery to act upon.
@@ -673,35 +815,43 @@ consistent state for recovery to act upon.
 We have toyed with the idea that a solution to this problem is to give each lock
 an explicit type, and all locks of a given type must share the same resource
 invariant (parameterized by the address of the resource that the lock is
-protecting). That way, we no longer have predicates on the heap, and the
+protecting).
+That way, we no longer have predicates on the heap, and the
 $(L^c,L^r)$ mapping to the left of $\vDash$, parameterized by both lock type and
 address, once again contains all possible strong invariants. Here, the strong
 invariants associated with each lock type would constitute the global invariants
 the program adheres to.
 
 As mentioned earlier, there is an alternative frame rule that combines the two
-frame rules that we currently have that we have not yet implemented. A related
+frame rules that we currently have that we have not yet implemented.
+A related
 issue is that any resource pulled into the pre-condition must also be pulled
 into the crash pre-condition, though the actual constraints (weak vs.\ strong)
-can differ between the two. Once dynamic memory is implemented, it seems to make
+can differ between the two.
+Once dynamic memory is implemented, it seems to make
 even less sense for something like $\exists (x:vnode), 10\mapsto x$ to appear in
 a strong invariant, since $10$ can be deallocated and reallocated.
 
 Our proposed solution to this problem is to combine the crash conditions into
 the regular conditions and maintain only a set of addresses, each of which
 would be tagged directly with both the weak and strong invariants by which it
-must abide (according to the lock type that protects the address). The strong
-invariant must be respected whenever we store to that address, and the weak
-invariant must be respected whenever we attempt to release the lock protecting
-that address. Now, we have an even simpler frame rule that can frame anything
-out of the current state, since framing out an address automatically frames out
-both the strong and weak invariants associated with it.
+must abide (according to the lock type that protects the address).
+The strong
+invariant must be respected whenever we store
+to that address, and the weak invariant must be respected whenever we attempt to
+release the lock protecting that address.
+Now, we have an even simpler frame
+rule that can frame anything out of the current state, since framing out an
+address automatically frames out both the strong and weak invariants associated
+with it.
 
 As an aside, it might have been possible to avoid making the language completely
 imperative by just extending FSCQ's disk read and write operations with lock and
-heap operations. It was only recently we realized it made sense to restrict
+heap operations.
+It was only recently we realized it made sense to restrict
 crash resource invariants to only describe precisely the resource that the lock
-protects. The fundamental concurrent crash Hoare logic remains the same, but we
+protects.
+The fundamental concurrent crash Hoare logic remains the same, but we
 could potentially use Coq values directly.
 
 \section{Conclusions}

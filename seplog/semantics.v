@@ -201,6 +201,7 @@ Inductive StmtSteps: Heap -> Locals -> stmt ->
 | step_putlock: forall h loc t id heapaddr,
      NatMap.find id loc = Some (v_lock (mkaddr t heapaddr MemoryHeap)) ->
      (* XXX shouldn't we require that we hold the lock? *)
+     (* (XXX: maybe we can't; see notes elsewhere *)
      heap_get_lockstate heapaddr h = Some LockHeld ->
      StmtSteps h loc (s_putlock (mkvar (t_lock t) id))
                (heap_set_lockstate heapaddr LockAvailable h) loc (s_skip)

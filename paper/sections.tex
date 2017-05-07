@@ -673,7 +673,7 @@ a strong invariant, since $10$ can be deallocated and reallocated.
 
 Our proposed solution to this problem is to combine the crash conditions into
 the regular conditions, and directly tag an address with both the weak and
-strong invariants that it must abide by (according to the lock type that
+strong invariants by which it must abide (according to the lock type that
 protects the address). The strong invariant must be respected whenever we store
 to that address, and the weak invariant must be respected whenever we attempt to
 release the lock protecting that address. Now, we have an even simpler frame

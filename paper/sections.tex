@@ -517,37 +517,40 @@ we can use the rule of consequence to change the post-condition to match
 whatever pre-condition we like.
 
 What does it mean for a statement's crash pre-condition to be True? By the rule
-of consequence, it means that we can never execute it (unless the current crash
-pre-condition happens to also be True). Similarly, having a current crash
-pre-condition of True means we can prove anything, since any statement's crash
-pre-condition must imply True. A statement's crash pre-condition being True is
-effectively saying that the statement does not adhere to \textit{any}
-invariants.
+of consequence, it means we cannot establish a Hoare septuple for a sequence
+to this statement (unless the current crash post-condition happens to also be
+True). Similarly, a crash pre-condition of True may be established for any
+statement, since any statement's more precise crash pre-condition may imply
+True. Intuitively, a True crash pre-condition releases the Hoare septuple's
+statement from adhering to \textit{any} invariants; a Hoare septuple with a
+True crash pre-condition does not claim the statement adheres to any invariant.
 
 By similar reasoning, if a statement's crash pre-condition is False, then it
-supports \textit{all} possible invariants. For example, any operation that does
+supports \textit{all} possible invariants. For example, an operation that does
 not modify any state can have a crash pre-condition of False.
 
-If a statement's crash pre-condition is $emp$, then that asserts requires that
-its heap is permanently empty (the only way we could add something to the heap
-is by acquiring a lock, which would require having access to something on the
-heap in the first place). This would be useful for completely pure functions
-that do not touch the heap.
+If a statement's crash pre-condition is $emp$, then that asserts and requires
+that its heap is permanently empty (the only way we could add something to the
+heap is by acquiring a lock, which would require having access to something on
+the heap in the first place). This could be useful for specifying completely
+pure functions that do not touch the heap.
 
-On the other side of the septuple, what about the crash post-condition (assuming
-we meet the pre-conditions)? If a statement's crash post-condition is True, then
-we can always execute the statement, regardless of our current post-condition.
-Again, True implies that no invariant is being respected, and so if the
-statement ends with no respected invariants, we can just add more invariants to
-get the invariant that we promise to respect in our current post-condition.
+On the other side of the septuple, what about the crash post-condition
+(assuming we meet the pre-conditions)? If a statement's crash post-condition
+is True, then we can sequence to a statement with any crash pre-condition.
+Again, True implies respect for no invariant, and so if the statement ends
+without further requirements for respected invariants, we can just add more
+invariants to get the invariant that the sequenced statement promises to
+respect.
 
 On the other hand, if the statement's crash post-condition is False, we can
-never execute it (unless our current crash post-condition is False).
+never execute another statement (unless the next statement's crash
+post-condition is also False).
 
 Finally, if the statement's crash post-condition is $emp$, the heap must remain
-empty after the statement returns. This is not strictly permanent, though, since we
-could always have framed out part of the heap prior to executing the statement,
-and frame it back in after.
+empty after the statement returns. This is not strictly permanent, though,
+since we could always have framed out part of the heap prior to executing the
+statement, and frame it back in after.
 
 Interestingly, even applying the rule of consequence seems to work in the
 opposite direction for crash conditions. Take the rule for the \texttt{skip}

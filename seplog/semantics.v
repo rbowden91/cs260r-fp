@@ -225,6 +225,11 @@ Inductive ThreadStepsStart: Thread -> Thread -> Thread -> Prop :=
      ThreadStepsStart (thread s) (thread s') (thread s2)
 .
 
+Inductive ThreadDone: Thread -> Prop :=
+| thread_done: forall loc,
+     ThreadDone (thread (stack_frame loc stack_empty s_skip))
+.
+
 End Threads.
 
 (**************************************************************)	
@@ -245,6 +250,10 @@ Inductive MachineSteps: Machine -> Machine -> Prop :=
      ThreadStepsStart t t1 t2 ->
      MachineSteps (machine h (ts1 ++ [t] ++ ts2))
 		  (machine h (ts1 ++ [t1; t2] ++ ts2))
+| machine_steps_exit: forall h t ts1 ts2,
+     ThreadDone t ->
+     MachineSteps (machine h (ts1 ++ [t] ++ ts2))
+		  (machine h (ts1 ++ ts2))
 .
 
 End Machines.

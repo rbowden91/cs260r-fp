@@ -39,9 +39,14 @@ Definition type_of_var v :=
    | mkvar t _ => t
    end.
 
+Inductive WhichHeap: Set :=
+| MemoryHeap: WhichHeap
+| DiskHeap (disknum: nat): WhichHeap
+.
+
 (* heap addresses are also numbers (and which heap, currently a bool) *)
 Inductive addr: Type :=
-| mkaddr : type -> nat -> bool -> addr
+| mkaddr : type -> nat -> WhichHeap -> addr
 .
 
 Inductive value : Type :=
@@ -61,9 +66,9 @@ Function type_of_value (v: value): type :=
    | v_nat _ => t_nat
    | v_bool _ => t_bool
    | v_pair a b => t_pair (type_of_value a) (type_of_value b)
-   | v_list t l => t
-   | v_addr (mkaddr ty _ _) => ty
-   | v_lock (mkaddr ty _ _) => ty
+   | v_list t l => t_list t
+   | v_addr (mkaddr ty _ _) => t_addr ty
+   | v_lock (mkaddr ty _ _) => t_lock ty
    | v_undef => t_unit (* XXX *)
    end.
 
@@ -91,21 +96,27 @@ Inductive stmt: Type :=
 | s_assign: var -> expr -> stmt
 | s_load: var -> expr -> stmt
 | s_store: var -> expr -> stmt
-| s_scope: stmt -> stmt
 | s_if: expr -> stmt -> stmt -> stmt
 | s_while: expr -> stmt -> stmt
 | s_call: var -> proc -> expr -> stmt
-| s_local: var -> expr -> stmt
 | s_return: expr -> stmt
 | s_getlock: var -> stmt
 | s_putlock: var -> stmt
 with
 
 (*
+ * variable declarations take values
+ * (everything needs to be initialized)
+ *)
+(*Inductive*) vardecl: Type :=
+| mkvardecl: var -> expr -> vardecl
+with
+
+(*
  * procs both take and produce values
  *)
 (*Inductive*) proc: Type :=
-| mkproc: type -> var -> stmt -> proc
+| mkproc: type -> var -> list vardecl -> stmt -> proc
 .
 
 

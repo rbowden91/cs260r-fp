@@ -61,6 +61,7 @@ Inductive ExprYields: forall t, Locals -> expr -> value -> Prop :=
     ExprYields t loc (e_value t a) a
 | read_yields: forall loc t (x : var) id a,
     (* XXX tidy this *)
+    type_of_value a = t ->
     x = mkvar t id -> NatMap.find id loc = Some (mkval t a) ->
     ExprYields t loc (e_read x) a
 | cond_true_yields: forall t loc e et ef a,

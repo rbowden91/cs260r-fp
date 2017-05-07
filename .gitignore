@@ -8,3 +8,7 @@
 .depend
 proposal/*.log
 proposal/article.pdf
+paper/*.log
+paper/*.bbl
+paper/*.blg
+paper/paper.pdf

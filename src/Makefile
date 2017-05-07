@@ -1,3 +1,6 @@
+disable:
+	false
+
 COQC=coqc
 COQDEP=coqdep
 

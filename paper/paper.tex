@@ -1,0 +1,47 @@
+% cs260 final writeup
+% XXX: check on layout specs
+% limit two pages, due Monday April 17
+
+% layout
+\documentclass[10pt, twocolumn, letterpaper]{article}
+\usepackage{fullpage}
+\frenchspacing
+%\usepackage{parskip}
+
+% fonts
+\usepackage{charter}
+\usepackage{courier}
+
+% other stuff
+\usepackage{graphicx}
+\usepackage{url}
+
+% without help, latex sets these characters in the wrong font inside \tt
+\newcommand{\us}{{\tt\char`\_}}
+\newcommand{\bra}{{\tt\char`\{}}
+\newcommand{\ket}{{\tt\char`\}}}
+\newcommand{\bs}{{\tt\char`\\}}
+
+\usepackage{color}
+\newcommand{\XXX}[1]{{\bf\color{red} #1}}
+
+\newcommand{\coqsize}{\scriptsize}
+
+\title{RoosterFS \\ {\Large CS260 Project Writeup}}
+\author{Rob Bowden, David Holland, Eric Lu}
+\date{May 8, 2017}
+
+\begin{document}
+\maketitle
+
+\input{sections}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+{
+\footnotesize
+\bibliographystyle{abbrv}
+\bibliography{paper}
+}
+
+\end{document}

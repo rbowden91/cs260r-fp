@@ -38,7 +38,7 @@ Section Stores.
 
 Inductive LockState: Set :=
 | LockHeld: LockState (* XXX: keep track of who holds it? *)
-| LockAvailable
+| LockAvailable: LockState
 .
 
 (* old form that used coq types directly
@@ -121,10 +121,19 @@ Inductive StmtSteps: Lockenv -> Heap -> Locals -> stmt ->
 | step_while_false: forall le h loc e body,
      ExprYields t_bool loc e v_false ->
      StmtSteps le h loc (s_while e body) le h loc s_skip
-(* XXX
-| step_getlock: ?
-| step_putlock: ?
-*)
+| step_getlock: forall le h loc t id heapaddr whichheap,
+     (* XXX whichheap should be restricted to memory *)
+     NatMap.find id loc = Some (v_lock (mkaddr t heapaddr whichheap)) ->
+     NatMap.find heapaddr le = Some LockAvailable ->
+     StmtSteps le h loc (s_getlock (mkvar (t_lock t) id))
+               (NatMap.add heapaddr LockHeld le) h loc (s_skip)
+| step_putlock: forall le h loc t id heapaddr whichheap,
+     (* XXX whichheap should be restricted to memory *)
+     NatMap.find id loc = Some (v_lock (mkaddr t heapaddr whichheap)) ->
+     (* XXX shouldn't we require that we hold the lock? *)
+     NatMap.find heapaddr le = Some LockHeld ->
+     StmtSteps le h loc (s_putlock (mkvar (t_lock t) id))
+               (NatMap.add heapaddr LockAvailable le) h loc (s_skip)
 .
 
 End Statements.

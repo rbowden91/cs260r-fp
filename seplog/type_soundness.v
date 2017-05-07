@@ -162,10 +162,12 @@ Proof.
       eauto.
     + intros.
       constructor.
+  - admit. (* getlock *)
+  - admit. (* putlock *)
 (* not sure what this is about *)
 Unshelve.
 all: auto.
-Qed.
+Admitted.
 
 
 (* we are going to prove progress by induction on statements

@@ -36,6 +36,11 @@ Require Import ast.
 
 Section Stores.
 
+Inductive LockState: Set :=
+| LockHeld: LockState (* XXX: keep track of who holds it? *)
+| LockAvailable
+.
+
 (* old form that used coq types directly
 Inductive val: Type := mkval (t: Type) (a : t): val.
 
@@ -43,6 +48,7 @@ Definition Heap := NatMap.t val.
 Definition Locals := NatMap.t val.
 *)
 
+Definition Lockenv := NatMap.t LockState.
 Definition Heap := NatMap.t value.
 Definition Locals := NatMap.t value.
 
@@ -79,38 +85,42 @@ End Expressions.
 Section Statements.
 
 (* call, return, and start appear at higher levels *)
-Inductive StmtSteps: Heap -> Locals -> stmt -> Heap -> Locals -> stmt -> Prop :=
-| step_in_seq: forall h loc s1 s2 h' loc' s1',
-     StmtSteps h loc s1 h' loc' s1' ->
-     StmtSteps h loc (s_seq s1 s2) h' loc' (s_seq s1' s2)
-| step_next: forall h loc s2,
-     StmtSteps h loc (s_seq s_skip s2) h loc s2
-| step_assign: forall h loc id type e a,
+Inductive StmtSteps: Lockenv -> Heap -> Locals -> stmt ->
+                     Lockenv -> Heap -> Locals -> stmt -> Prop :=
+| step_in_seq: forall le h loc s1 s2 le' h' loc' s1',
+     StmtSteps le h loc s1 le' h' loc' s1' ->
+     StmtSteps le h loc (s_seq s1 s2) le' h' loc' (s_seq s1' s2)
+| step_next: forall le h loc s2,
+     StmtSteps le h loc (s_seq s_skip s2) le h loc s2
+| step_assign: forall le h loc id type e a,
      ExprYields type loc e a ->
-     StmtSteps h loc (s_assign (mkvar type id) e) h (NatMap.add id a loc) s_skip
-| step_load: forall h loc type lid e hid heapnum a,
+     StmtSteps le h loc (s_assign (mkvar type id) e)
+               le h (NatMap.add id a loc) s_skip
+| step_load: forall le h loc type lid e hid heapnum a,
      (* XXX this is wrong (needs to handle heapnum) *)
      ExprYields type loc e (v_addr (mkaddr type hid heapnum)) ->
      NatMap.find hid h = Some a ->
-     StmtSteps h loc (s_load (mkvar type lid) e) h (NatMap.add lid a loc) s_skip
-| step_store: forall h loc type lid e hid heapnum a,
+     StmtSteps le h loc (s_load (mkvar type lid) e)
+               le h (NatMap.add lid a loc) s_skip
+| step_store: forall le h loc type lid e hid heapnum a,
      (* XXX this is wrong (needs to handle heapnum) *)
      ExprYields type loc e a ->
      ExprYields type loc (e_read (mkvar type lid)) (v_addr (mkaddr type hid heapnum)) ->
-     StmtSteps h loc (s_store (mkvar type lid) e) (NatMap.add hid a h) loc s_skip
-| step_if_true: forall h loc e st sf,
+     StmtSteps le h loc (s_store (mkvar type lid) e)
+               le (NatMap.add hid a h) loc s_skip
+| step_if_true: forall le h loc e st sf,
      ExprYields t_bool loc e v_true ->
-     StmtSteps h loc (s_if e st sf) h loc st
-| step_if_false: forall h loc e st sf,
+     StmtSteps le h loc (s_if e st sf) le h loc st
+| step_if_false: forall le h loc e st sf,
      ExprYields t_bool loc e v_false ->
-     StmtSteps h loc (s_if e st sf) h loc sf
-| step_while_true: forall h loc e body,
+     StmtSteps le h loc (s_if e st sf) le h loc sf
+| step_while_true: forall le h loc e body,
      ExprYields t_bool loc e v_true ->
-     StmtSteps h loc (s_while e body)
-               h loc (s_seq body (s_while e body))
-| step_while_false: forall h loc e body,
+     StmtSteps le h loc (s_while e body)
+               le h loc (s_seq body (s_while e body))
+| step_while_false: forall le h loc e body,
      ExprYields t_bool loc e v_false ->
-     StmtSteps h loc (s_while e body) h loc s_skip
+     StmtSteps le h loc (s_while e body) le h loc s_skip
 (* XXX
 | step_getlock: ?
 | step_putlock: ?
@@ -145,19 +155,22 @@ Inductive Stack: Type :=
 | stack_frame: Locals -> Stack -> stmt -> Stack
 .
 
-Inductive StackSteps: Heap -> Stack -> Heap -> Stack -> Prop :=
+Inductive StackSteps: Lockenv -> Heap -> Stack ->
+                      Lockenv -> Heap -> Stack -> Prop :=
 
-| stack_steps_stmt: forall h loc stk s h' loc' s',
-     StmtSteps h loc s h' loc' s' ->
-     StackSteps h (stack_frame loc stk s) h' (stack_frame loc' stk s')
+| stack_steps_stmt: forall le h loc stk s le' h' loc' s',
+     StmtSteps le h loc s
+               le' h' loc' s' ->
+     StackSteps le h (stack_frame loc stk s)
+                le' h' (stack_frame loc' stk s')
 
-| stack_steps_call_final: forall h loc stk x proc arg,
+| stack_steps_call_final: forall h le loc stk x proc arg,
      (* gross but avoids duplicating the call frame logic *)
-     StackSteps h (stack_frame loc stk (s_call x proc arg))
-                h (stack_frame loc stk (s_seq (s_call x proc arg) s_skip))
+     StackSteps le h (stack_frame loc stk (s_call x proc arg))
+                le h (stack_frame loc stk (s_seq (s_call x proc arg) s_skip))
 
 | stack_steps_call_seq: forall
-                            h loc stk s s2
+                            le h loc stk s s2
                             rt retid pt paramid decls body arg argval
                             s' new'loc,
      (* restrict the form of the call statement *)
@@ -177,15 +190,15 @@ Inductive StackSteps: Heap -> Stack -> Heap -> Stack -> Prop :=
                    new'loc ->
 
      (* make a new frame to evaluate the procedure body *)
-     StackSteps h (stack_frame loc stk s)
-                h (stack_frame new'loc (stack_frame loc stk s') body)
+     StackSteps le h (stack_frame loc stk s)
+                le h (stack_frame new'loc (stack_frame loc stk s') body)
 
-| stack_steps_return_seq: forall h loc stk e s2,
+| stack_steps_return_seq: forall le h loc stk e s2,
      (* return followed by crap is just return *)
-     StackSteps h (stack_frame loc stk (s_seq (s_return e) s2))
-                h (stack_frame loc stk (s_return e))
+     StackSteps le h (stack_frame loc stk (s_seq (s_return e) s2))
+                le h (stack_frame loc stk (s_return e))
 
-| stack_steps_return_final: forall h
+| stack_steps_return_final: forall le h
                                 loc loc' stk' s' s''
                                 rt ret retval
                                 x ejunk,
@@ -199,8 +212,8 @@ Inductive StackSteps: Heap -> Stack -> Heap -> Stack -> Prop :=
      s'' = s_assign x (e_value rt retval) ->
 
      (* pop the frame *)
-     StackSteps h (stack_frame loc (stack_frame loc' stk' s') (s_return ret))
-                h (stack_frame loc' stk' s'')
+     StackSteps le h (stack_frame loc (stack_frame loc' stk' s') (s_return ret))
+                le h (stack_frame loc' stk' s'')
 .
 
 (* this is its own thing because it needs a different signature *)
@@ -231,10 +244,11 @@ Inductive Thread: Type :=
 | thread: Stack -> Thread
 .
 
-Inductive ThreadSteps: Heap -> Thread -> Heap -> Thread -> Prop :=
-| thread_steps: forall h s h' s',
-     StackSteps h s h' s' -> 
-     ThreadSteps h (thread s) h' (thread s')
+Inductive ThreadSteps: Lockenv -> Heap -> Thread ->
+                       Lockenv -> Heap -> Thread -> Prop :=
+| thread_steps: forall le h s le' h' s',
+     StackSteps le h s le' h' s' -> 
+     ThreadSteps le h (thread s) le' h' (thread s')
 .
 
 Inductive ThreadStepsStart: Thread -> Thread -> Thread -> Prop :=
@@ -257,22 +271,27 @@ End Threads.
 Section Machines.
 
 Inductive Machine: Type :=
-| machine: Heap -> list Thread -> Machine
+| machine: Lockenv -> Heap -> list Thread -> Machine
 .
 
+(*
+ * XXX: how do we reason about properties like "a thread may not exit
+ * while it holds locks"?
+ *)
+
 Inductive MachineSteps: Machine -> Machine -> Prop :=
-| machine_steps_plain: forall h t h' t' ts1 ts2,
-     ThreadSteps h t h' t' ->
-     MachineSteps (machine h (ts1 ++ [t] ++ ts2))
-                  (machine h' (ts1 ++ [t'] ++ ts2))
-| machine_steps_start: forall h t t1 t2 ts1 ts2,
+| machine_steps_plain: forall le h t le' h' t' ts1 ts2,
+     ThreadSteps le h t le' h' t' ->
+     MachineSteps (machine le h (ts1 ++ [t] ++ ts2))
+                  (machine le' h' (ts1 ++ [t'] ++ ts2))
+| machine_steps_start: forall le h t t1 t2 ts1 ts2,
      ThreadStepsStart t t1 t2 ->
-     MachineSteps (machine h (ts1 ++ [t] ++ ts2))
-                  (machine h (ts1 ++ [t1; t2] ++ ts2))
-| machine_steps_exit: forall h t ts1 ts2,
+     MachineSteps (machine le h (ts1 ++ [t] ++ ts2))
+                  (machine le h (ts1 ++ [t1; t2] ++ ts2))
+| machine_steps_exit: forall le h t ts1 ts2,
      ThreadDone t ->
-     MachineSteps (machine h (ts1 ++ [t] ++ ts2))
-                  (machine h (ts1 ++ ts2))
+     MachineSteps (machine le h (ts1 ++ [t] ++ ts2))
+                  (machine le h (ts1 ++ ts2))
 .
 
 End Machines.

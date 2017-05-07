@@ -65,11 +65,11 @@ Qed.
 
 (* preservation *)
 Lemma StmtStepsPreserves :
-  forall h l s,
+  forall le h l s,
     localenv_sound l s ->
     (forall t name, StmtVarRespectsT t name s) ->
-    forall h' l' s',
-      StmtSteps h l s h' l' s' ->
+    forall le' h' l' s',
+      StmtSteps le h l s le' h' l' s' ->
       localenv_sound l' s' /\ (forall t name, StmtVarRespectsT t name s').
 Proof.
   intros.
@@ -174,12 +174,12 @@ Qed.
 
 (* progress *)
 Lemma StmtStepsProgress :
-  forall h l s,
+  forall le h l s,
     localenv_sound l s ->
     (forall t name, StmtVarRespectsT t name s) ->
     s <> s_skip ->
-    exists h' l' s',
-      StmtSteps h l s h' l' s'.
+    exists le' h' l' s',
+      StmtSteps le h l s le' h' l' s'.
 Proof.
   intros.
 Admitted.
@@ -293,11 +293,11 @@ Qed.
 
 
 Lemma StmtStepsPreserves_new :
-  forall tyenv h l s,
+  forall tyenv le h l s,
     VarsScopedStmt tyenv s ->
     localenv_sound_new tyenv l ->
-    forall h' l' s',
-       StmtSteps h l s h' l' s' ->
+    forall le' h' l' s',
+       StmtSteps le h l s le' h' l' s' ->
           VarsScopedStmt tyenv s' /\
           localenv_sound_new tyenv l'.
 Proof.
@@ -346,10 +346,10 @@ Definition ThreadStateSound tyenv t :=
    end.
 
 Lemma ThreadStepsPreserves_new:
-   forall tyenv h t,
+   forall tyenv le h t,
       ThreadStateSound tyenv t ->
-      forall h' t',
-         ThreadSteps h t h' t' ->
+      forall le' h' t',
+         ThreadSteps le h t le' h' t' ->
          ThreadStateSound tyenv t'.
 Proof.
    intros.
@@ -358,7 +358,9 @@ Proof.
    - unfold ThreadStateSound in *.
      destruct H as [H1 H2].
      apply StmtStepsPreserves_new with
-         (h := h) (l := loc) (s := s) (h' := h') (l' := loc') (s' := s') in H1; auto.
+         (tyenv := tyenv)
+            (h := h) (l := loc) (s := s)
+            (h' := h') (l' := loc') (s' := s') in H0; auto.
    - (* call *)
      unfold ThreadStateSound in *.
      destruct H as [H1 H2].
@@ -465,17 +467,17 @@ Proof.
 Qed.
 
 Lemma StmtStepsProgress_new:
-  forall tyenv h l s,
+  forall tyenv le h l s,
     VarsScopedStmt tyenv s ->
     localenv_sound_new tyenv l ->
     s <> s_skip ->
     (forall p arg, s = s_start p arg -> False) ->
     (forall x p e, s = s_call x p e -> False) ->
     (forall e, s = s_return e -> False) ->
-    exists h' l' s',
-      StmtSteps h l s h' l' s'.
+    exists le' h' l' s',
+       StmtSteps le h l s le' h' l' s'.
 Proof.
-  intros tyenv h l s; revert tyenv h l.
+  intros tyenv le h l s; revert tyenv le h l.
   induction s; intros.
   - contradiction.
   - admit.
@@ -483,7 +485,7 @@ Proof.
   - inversion H; subst.
     apply ExprStepsProgress_new with (l := l) in H8; auto.
     destruct H8 as [a H8].
-    exists h, (NatMap.add id a l), s_skip.
+    exists le, h, (NatMap.add id a l), s_skip.
     apply step_assign with (h := h) (loc := l) (id := id) (type := t) (e := e) (a := a).
     auto.
   - admit.
@@ -503,11 +505,11 @@ Definition threadstmt_is (t: Thread) s0 :=
    end.
 
 Lemma ThreadStepsProgress_new:
-   forall tyenv h t,
+   forall tyenv le h t,
       ThreadStateSound tyenv t ->
       (forall p arg, threadstmt_is t (s_start p arg) = False) ->
-      exists h' t',
-         ThreadSteps h t h' t'.
+      exists le' h' t',
+         ThreadSteps le h t le' h' t'.
 Proof.
 Admitted.
 

@@ -365,7 +365,7 @@ Proof.
      admit.
    - (* call #2 *)
      unfold ThreadStateSound in *.
-     destruct H as [H1 H2].
+     destruct H as [Ha Hb].
      admit.
    - (* return *)
      admit.

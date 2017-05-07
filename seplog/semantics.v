@@ -145,21 +145,6 @@ Inductive Stack: Type :=
 | stack_frame: Locals -> Stack -> stmt -> Stack
 .
 
-Inductive CallSteps: Stack -> Locals -> stmt ->
-                     Stack -> Locals -> stmt -> Prop :=
-| call_steps: forall loc arg argval stk retid rt paramid pt decls newloc body,
-     ExprYields pt loc arg argval ->
-     VardeclsSteps (NatMap.add paramid argval (NatMap.empty value))
-                   decls
-                   newloc ->
-     CallSteps stk loc (s_call (mkvar rt retid)
-                               (mkproc rt (mkvar pt paramid) decls body)
-                               arg)
-               (stack_frame loc stk (s_assign (mkvar rt retid) (e_value rt v_undef)))
-               newloc
-               body
-.
-
 Inductive ReturnSteps: Stack -> Locals -> stmt ->
                         Stack -> Locals -> stmt -> Prop :=
 | return_steps: forall loc loc' rt retid stk ejunk ret retval,
@@ -172,14 +157,31 @@ Inductive StackSteps: Heap -> Stack -> Heap -> Stack -> Prop :=
 | stack_steps_stmt: forall h loc stk s h' loc' s',
      StmtSteps h loc s h' loc' s' ->
      StackSteps h (stack_frame loc stk s) h' (stack_frame loc' stk s')
-| stack_steps_call_final: forall h loc stk s loc' stk' s',
-     CallSteps stk loc s stk' loc' s' ->
-     StackSteps h (stack_frame loc stk s)
-		 h (stack_frame loc' stk' s')
-| stack_steps_call_seq: forall h loc stk s s2 loc' stk' s',
-     CallSteps stk loc s stk' loc' s' ->
+| stack_steps_call_final: forall h loc stk x proc arg,
+     (* gross but avoids duplicating the call frame logic *)
+     StackSteps h (stack_frame loc stk (s_call x proc arg))
+                h (stack_frame loc stk (s_seq (s_call x proc arg) s_skip))
+| stack_steps_call_seq: forall
+                            h loc stk s s2
+                            rt retid pt paramid decls body arg argval
+                            s' new'loc,
+     (* restrict the form of the call statement *)
+     s = (s_call (mkvar rt retid)
+                 (mkproc rt (mkvar pt paramid) decls body)
+                 arg) ->
+     (* the new statement for the current frame *)
+     s' = s_seq (s_assign (mkvar rt retid) (e_value rt v_undef)) s2 ->
+
+     (* evaluate the arg in the current frame *)
+     ExprYields pt loc arg argval ->
+     (* create the new frame *)
+     VardeclsSteps (NatMap.add paramid argval (NatMap.empty value))
+                   decls
+                   new'loc ->
+
+     (* complete statement *)
      StackSteps h (stack_frame loc stk (s_seq s s2))
-		 h (stack_frame loc' stk' (s_seq s' s2))
+                h (stack_frame new'loc (stack_frame loc stk s') body)
 | stack_steps_return_final: forall h loc stk s loc' stk' s',
      ReturnSteps stk loc s stk' loc' s' ->
      StackSteps h (stack_frame loc stk s)

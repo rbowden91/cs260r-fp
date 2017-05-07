@@ -543,10 +543,10 @@ Proof.
   - destruct l.
     * unfold s_skip; contradiction.
     * admit.
-  - specialize (H2 pt p e). contradiction.
+  - specialize (H2 p e). contradiction.
   - inversion H; subst.
-    apply ExprStepsProgress_new with (l := l) in H10; auto.
-    destruct H10 as [a H10].
+    apply ExprStepsProgress_new with (l := l) in H8; auto.
+    destruct H8 as [a H8].
     exists h, (NatMap.add id (mkval t a) l), s_skip.
     apply step_assign with (h := h) (loc := l) (id := id) (type := t) (e := e) (a := a).
     auto.

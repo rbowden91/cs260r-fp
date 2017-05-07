@@ -118,8 +118,8 @@ Definition typeof_val (v : value) (t : type) : Prop :=
   | v_bool _ => t_bool = t
   | v_pair _ _ => False (* XXX notyet *)
   | v_list t' => t_list t = t
-  | v_addr (_,_,t') => t_addr t' = t
-  | v_lock (_,_,t') => t_lock t' = t
+  | v_addr (mkaddr t' _ _) => t_addr t' = t
+  | v_lock (mkaddr t' _ _) => t_lock t' = t
   | v_undef => False
   end.
 
@@ -127,7 +127,7 @@ Function typeof_expr (e : expr) (rho : env) (t : type) : Prop :=
   match e with
   | e_read v => match table_get rho v with
                 | None => False
-                | Some _ => snd v = t
+                | Some _ => type_of_var v = t
                 end
   | e_value v => typeof_val v t
   | e_cond eb e1 e2 =>
@@ -138,7 +138,7 @@ Function typeof_expr (e : expr) (rho : env) (t : type) : Prop :=
 
 Lemma tt_sound :
   forall {v} {a : value} {rho : env}, table_get rho v = Some a ->
-  typeof_val a (snd v).
+  typeof_val a (type_of_var v).
 Proof.
 Admitted.
 
@@ -232,7 +232,7 @@ Inductive hoare_stmt :
               forall C P v e,
               hoare_stmt retC ret lk_invs
                            C
-                           (fun rho => P rho && !!(typeof_expr e rho (snd v)))
+                           (fun rho => P rho && !!(typeof_expr e rho (type_of_var v)))
                              (s_assign v e)
                            (assign_forward v e C)
                            (assign_forward v e P)
@@ -270,12 +270,12 @@ Inductive hoare_stmt :
                forall v a lk, (* XXX should this go as an EX? *)
                hoare_stmt retC ret lk_invs
                           (fun rho => emp)
-                          (fun rho => EX t:type, (!!(snd v = t_addr (t_lock t))
+                          (fun rho => EX t:type, (!!(type_of_var v = t_addr (t_lock t))
                                       && !!(table_get rho v = Some (v_addr a))
                                       && mapsto a lk))
                             (s_getlock v)
                           (fun rho => crash_inv lk lk_invs)
-                          (fun rho => EX t:type, (!!(snd v = t_addr (t_lock t))
+                          (fun rho => EX t:type, (!!(type_of_var v = t_addr (t_lock t))
                                       && !!(table_get rho v = Some (v_addr a))
                                       && mapsto a lk * reg_inv lk lk_invs))
 
@@ -283,12 +283,12 @@ Inductive hoare_stmt :
                forall v a lk, (* XXX should this go as an EX? *)
                hoare_stmt retC ret lk_invs
                           (fun rho => crash_inv lk lk_invs)
-                          (fun rho => EX t:type, (!!(snd v = t_addr (t_lock t))
+                          (fun rho => EX t:type, (!!(type_of_var v = t_addr (t_lock t))
                                       && !!(table_get rho v = Some (v_addr a))
                                       && mapsto a lk * reg_inv lk lk_invs))
                             (s_putlock v)
                           (fun rho => emp)
-                          (fun rho => EX t:type, (!!(snd v = t_addr (t_lock t))
+                          (fun rho => EX t:type, (!!(type_of_var v = t_addr (t_lock t))
                                       && !!(table_get rho v = Some (v_addr a))
                                       && mapsto a lk))
 
@@ -297,7 +297,7 @@ Inductive hoare_stmt :
             forall a ptr,
             hoare_stmt retC ret lk_invs
                            C
-                           (fun rho => P rho && !!(typeof_expr e rho (t_addr (snd v)))
+                           (fun rho => P rho && !!(typeof_expr e rho (t_addr (type_of_var v)))
                                        && !!(eval_expr e rho = v_addr ptr)
                                        * mapsto ptr a)
                               (s_load v e)
@@ -309,14 +309,14 @@ Inductive hoare_stmt :
             forall ptr t val,
             hoare_stmt retC ret lk_invs
                            C
-                           (fun rho => P rho && !!(snd v = t_addr t)
+                           (fun rho => P rho && !!(type_of_var v = t_addr t)
                                        && !!(typeof_expr e rho t)
                                        && !!(table_get rho v = Some (v_addr ptr))
                                        && !!(eval_expr e rho = val)
                                        * ex_mapsto ptr)
                               (s_store v e)
                            C
-                           (fun rho => P rho && !!(snd v = t_addr t)
+                           (fun rho => P rho && !!(type_of_var v = t_addr t)
                                        && !!(table_get rho v = Some (v_addr ptr))
                                        * mapsto ptr val)
 (* XXX First, we can pass off crash conditions in the same way we frame them.
@@ -379,7 +379,7 @@ with hoare_proc :
                                      (fun r => !!(typeof_val r t) && Q a r)
                                      lk_invs
                                      (fun rho => PC a)
-                                     (fun rho => !!(typeof_val a (snd v)) && 
+                                     (fun rho => !!(typeof_val a (type_of_var v)) && 
                                                  !!(table_get rho v = Some a) && P a)
                                      s
                                      ETT
@@ -446,8 +446,8 @@ Lemma ht_call_nf : forall {retC ret},
 *)
 
 Definition example1 :=
-  p_proc t_nat (4,t_nat) ([{
-    s_return (e_read (4,t_nat)) ;
+  p_proc t_nat (mkvar t_nat 4) ([{
+    s_return (e_read (mkvar t_nat 4)) ;
     s_skip ;
   }]).
 
@@ -507,9 +507,9 @@ Proof.
 Qed.
 
 Definition example2 :=
-  p_proc t_nat (4,t_nat) ([{
-    s_call (5,t_nat) example1 (e_read (4,t_nat)) ;
-    s_return (e_read (5,t_nat)) ;
+  p_proc t_nat (mkvar t_nat 4) ([{
+    s_call (mkvar t_nat 5) example1 (e_read (mkvar t_nat 4)) ;
+    s_return (e_read (mkvar t_nat 5)) ;
   }]).
 
 Lemma example2_sound : forall lk_invs,

@@ -65,11 +65,11 @@ Qed.
 
 (* preservation *)
 Lemma StmtStepsPreserves :
-  forall le h l s,
+  forall h l s,
     localenv_sound l s ->
     (forall t name, StmtVarRespectsT t name s) ->
-    forall le' h' l' s',
-      StmtSteps le h l s le' h' l' s' ->
+    forall h' l' s',
+      StmtSteps h l s h' l' s' ->
       localenv_sound l' s' /\ (forall t name, StmtVarRespectsT t name s').
 Proof.
   intros.
@@ -176,12 +176,12 @@ Admitted.
 
 (* progress *)
 Lemma StmtStepsProgress :
-  forall le h l s,
+  forall h l s,
     localenv_sound l s ->
     (forall t name, StmtVarRespectsT t name s) ->
     s <> s_skip ->
-    exists le' h' l' s',
-      StmtSteps le h l s le' h' l' s'.
+    exists h' l' s',
+      StmtSteps h l s h' l' s'.
 Proof.
   intros.
 Admitted.
@@ -295,11 +295,11 @@ Qed.
 
 
 Lemma StmtStepsPreserves_new :
-  forall tyenv le h l s,
+  forall tyenv h l s,
     VarsScopedStmt tyenv s ->
     localenv_sound_new tyenv l ->
-    forall le' h' l' s',
-       StmtSteps le h l s le' h' l' s' ->
+    forall h' l' s',
+       StmtSteps h l s h' l' s' ->
           VarsScopedStmt tyenv s' /\
           localenv_sound_new tyenv l'.
 Proof.
@@ -348,10 +348,10 @@ Definition ThreadStateSound tyenv t :=
    end.
 
 Lemma ThreadStepsPreserves_new:
-   forall tyenv le h t,
+   forall tyenv h t,
       ThreadStateSound tyenv t ->
-      forall le' h' t',
-         ThreadSteps le h t le' h' t' ->
+      forall h' t',
+         ThreadSteps h t h' t' ->
          ThreadStateSound tyenv t'.
 Proof.
    intros.
@@ -469,17 +469,17 @@ Proof.
 Qed.
 
 Lemma StmtStepsProgress_new:
-  forall tyenv le h l s,
+  forall tyenv h l s,
     VarsScopedStmt tyenv s ->
     localenv_sound_new tyenv l ->
     s <> s_skip ->
     (forall p arg, s = s_start p arg -> False) ->
     (forall x p e, s = s_call x p e -> False) ->
     (forall e, s = s_return e -> False) ->
-    exists le' h' l' s',
-       StmtSteps le h l s le' h' l' s'.
+    exists h' l' s',
+       StmtSteps h l s h' l' s'.
 Proof.
-  intros tyenv le h l s; revert tyenv le h l.
+  intros tyenv h l s; revert tyenv h l.
   induction s; intros.
   - contradiction.
   - admit.
@@ -487,7 +487,7 @@ Proof.
   - inversion H; subst.
     apply ExprStepsProgress_new with (l := l) in H8; auto.
     destruct H8 as [a H8].
-    exists le, h, (NatMap.add id a l), s_skip.
+    exists h, (NatMap.add id a l), s_skip.
     apply step_assign with (h := h) (loc := l) (id := id) (type := t) (e := e) (a := a).
     auto.
   - admit.
@@ -507,11 +507,11 @@ Definition threadstmt_is (t: Thread) s0 :=
    end.
 
 Lemma ThreadStepsProgress_new:
-   forall tyenv le h t,
+   forall tyenv h t,
       ThreadStateSound tyenv t ->
       (forall p arg, threadstmt_is t (s_start p arg) = False) ->
-      exists le' h' t',
-         ThreadSteps le h t le' h' t'.
+      exists h' t',
+         ThreadSteps h t h' t'.
 Proof.
 Admitted.
 

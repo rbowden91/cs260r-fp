@@ -39,9 +39,14 @@ Definition type_of_var v :=
    | mkvar t _ => t
    end.
 
+Inductive WhichHeap: Set :=
+| MemoryHeap: WhichHeap
+| DiskHeap (disknum: nat): WhichHeap
+.
+
 (* heap addresses are also numbers (and which heap, currently a bool) *)
 Inductive addr: Type :=
-| mkaddr : type -> nat -> bool -> addr
+| mkaddr : type -> nat -> WhichHeap -> addr
 .
 
 Inductive value : Type :=

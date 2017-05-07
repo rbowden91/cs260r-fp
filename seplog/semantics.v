@@ -48,8 +48,13 @@ Definition Heap := NatMap.t val.
 Definition Locals := NatMap.t val.
 *)
 
-Definition Lockenv := NatMap.t LockState.
-Definition Heap := NatMap.t value.
+Inductive Heap :=
+| mkheap (memory: NatMap.t value)
+         (lockenv: NatMap.t LockState)
+         (disks: NatMap.t (NatMap.t value)):
+       Heap
+.
+
 Definition Locals := NatMap.t value.
 
 Definition get_locals (rho : Locals) (v : var) : option value :=
@@ -63,12 +68,63 @@ Definition set_locals (v : var) (val : value) (rho : Locals) : Locals :=
 
 Definition get_heap (rho : Heap) (a : addr) : option value :=
   match a with
-  | mkaddr t n b => NatMap.find n rho
+  | mkaddr t n b =>
+       match rho with
+       | mkheap memory _ _ =>  NatMap.find n memory
+       end
   end.
+
 Definition set_heap (a : addr) (val : value) (rho : Heap) : Heap :=
   match a with
-  | mkaddr t n b => NatMap.add n val rho
+  | mkaddr t n b =>
+       match rho with
+       | mkheap memory lockenv disks =>
+            mkheap (NatMap.add n val memory) lockenv disks
+       end
   end.
+
+Definition heap_get_data (whichheap: WhichHeap) (index: nat) (h: Heap):
+                                option value :=
+   match h with
+   | mkheap memory _ disks =>
+        match whichheap with
+        | MemoryHeap => NatMap.find index memory
+        | DiskHeap disknum =>
+             match NatMap.find disknum disks with
+             | Some disk => NatMap.find index disk
+             (* XXX we should have something that prevents getting here *)
+             | None => None
+             end
+        end
+   end.
+
+Definition heap_set_data (whichheap: WhichHeap) (index: nat)
+                         (val: value) (h: Heap): Heap :=
+   match h with
+   | mkheap memory lockenv disks =>
+        match whichheap with
+        | MemoryHeap =>
+             mkheap (NatMap.add index val memory) lockenv disks
+        | DiskHeap disknum =>
+             match NatMap.find disknum disks with
+             | Some disk =>
+                  let disk' := (NatMap.add index val disk) in
+                  mkheap memory lockenv (NatMap.add disknum disk' disks)
+             | None => mkheap memory lockenv disks
+             end
+        end
+   end.
+
+Definition heap_get_lockstate (index: nat) (h: Heap): option LockState :=
+   match h with
+   | mkheap _ lockenv _ => NatMap.find index lockenv
+   end.
+
+Definition heap_set_lockstate (index: nat) (val: LockState) (h: Heap): Heap :=
+   match h with
+   | mkheap memory lockenv disks =>
+        mkheap memory (NatMap.add index val lockenv) disks
+   end.
 
 End Stores.
 
@@ -103,55 +159,51 @@ End Expressions.
 Section Statements.
 
 (* call, return, and start appear at higher levels *)
-Inductive StmtSteps: Lockenv -> Heap -> Locals -> stmt ->
-                     Lockenv -> Heap -> Locals -> stmt -> Prop :=
-| step_in_seq: forall le h loc s1 s2 le' h' loc' s1',
-     StmtSteps le h loc s1 le' h' loc' s1' ->
-     StmtSteps le h loc (s_seq s1 s2) le' h' loc' (s_seq s1' s2)
-| step_next: forall le h loc s2,
-     StmtSteps le h loc (s_seq s_skip s2) le h loc s2
-| step_assign: forall le h loc id type e a,
+Inductive StmtSteps: Heap -> Locals -> stmt ->
+                     Heap -> Locals -> stmt -> Prop :=
+| step_in_seq: forall h loc s1 s2 h' loc' s1',
+     StmtSteps h loc s1 h' loc' s1' ->
+     StmtSteps h loc (s_seq s1 s2) h' loc' (s_seq s1' s2)
+| step_next: forall h loc s2,
+     StmtSteps h loc (s_seq s_skip s2) h loc s2
+| step_assign: forall h loc id type e a,
      ExprYields type loc e a ->
-     StmtSteps le h loc (s_assign (mkvar type id) e)
-               le h (NatMap.add id a loc) s_skip
-| step_load: forall le h loc type lid e hid heapnum a,
-     (* XXX this is wrong (needs to handle heapnum) *)
-     ExprYields type loc e (v_addr (mkaddr type hid heapnum)) ->
-     NatMap.find hid h = Some a ->
-     StmtSteps le h loc (s_load (mkvar type lid) e)
-               le h (NatMap.add lid a loc) s_skip
-| step_store: forall le h loc type lid e hid heapnum a,
-     (* XXX this is wrong (needs to handle heapnum) *)
+     StmtSteps h loc (s_assign (mkvar type id) e)
+               h (NatMap.add id a loc) s_skip
+| step_load: forall h loc type lid e hid whichheap a,
+     ExprYields type loc e (v_addr (mkaddr type hid whichheap)) ->
+     heap_get_data whichheap hid h = Some a ->
+     StmtSteps h loc (s_load (mkvar type lid) e)
+               h (NatMap.add lid a loc) s_skip
+| step_store: forall h loc type lid e hid whichheap a,
      ExprYields type loc e a ->
-     ExprYields type loc (e_read (mkvar type lid)) (v_addr (mkaddr type hid heapnum)) ->
-     StmtSteps le h loc (s_store (mkvar type lid) e)
-               le (NatMap.add hid a h) loc s_skip
-| step_if_true: forall le h loc e st sf,
+     ExprYields type loc (e_read (mkvar type lid)) (v_addr (mkaddr type hid whichheap)) ->
+     StmtSteps h loc (s_store (mkvar type lid) e)
+               (heap_set_data whichheap hid a h) loc s_skip
+| step_if_true: forall h loc e st sf,
      ExprYields t_bool loc e v_true ->
-     StmtSteps le h loc (s_if e st sf) le h loc st
-| step_if_false: forall le h loc e st sf,
+     StmtSteps h loc (s_if e st sf) h loc st
+| step_if_false: forall h loc e st sf,
      ExprYields t_bool loc e v_false ->
-     StmtSteps le h loc (s_if e st sf) le h loc sf
-| step_while_true: forall le h loc e body,
+     StmtSteps h loc (s_if e st sf) h loc sf
+| step_while_true: forall h loc e body,
      ExprYields t_bool loc e v_true ->
-     StmtSteps le h loc (s_while e body)
-               le h loc (s_seq body (s_while e body))
-| step_while_false: forall le h loc e body,
+     StmtSteps h loc (s_while e body)
+               h loc (s_seq body (s_while e body))
+| step_while_false: forall h loc e body,
      ExprYields t_bool loc e v_false ->
-     StmtSteps le h loc (s_while e body) le h loc s_skip
-| step_getlock: forall le h loc t id heapaddr whichheap,
-     (* XXX whichheap should be restricted to memory *)
-     NatMap.find id loc = Some (v_lock (mkaddr t heapaddr whichheap)) ->
-     NatMap.find heapaddr le = Some LockAvailable ->
-     StmtSteps le h loc (s_getlock (mkvar (t_lock t) id))
-               (NatMap.add heapaddr LockHeld le) h loc (s_skip)
-| step_putlock: forall le h loc t id heapaddr whichheap,
-     (* XXX whichheap should be restricted to memory *)
-     NatMap.find id loc = Some (v_lock (mkaddr t heapaddr whichheap)) ->
+     StmtSteps h loc (s_while e body) h loc s_skip
+| step_getlock: forall h loc t id heapaddr,
+     NatMap.find id loc = Some (v_lock (mkaddr t heapaddr MemoryHeap)) ->
+     heap_get_lockstate heapaddr h = Some LockAvailable ->
+     StmtSteps h loc (s_getlock (mkvar (t_lock t) id))
+               (heap_set_lockstate heapaddr LockHeld h) loc (s_skip)
+| step_putlock: forall h loc t id heapaddr,
+     NatMap.find id loc = Some (v_lock (mkaddr t heapaddr MemoryHeap)) ->
      (* XXX shouldn't we require that we hold the lock? *)
-     NatMap.find heapaddr le = Some LockHeld ->
-     StmtSteps le h loc (s_putlock (mkvar (t_lock t) id))
-               (NatMap.add heapaddr LockAvailable le) h loc (s_skip)
+     heap_get_lockstate heapaddr h = Some LockHeld ->
+     StmtSteps h loc (s_putlock (mkvar (t_lock t) id))
+               (heap_set_lockstate heapaddr LockAvailable h) loc (s_skip)
 .
 
 End Statements.
@@ -182,22 +234,22 @@ Inductive Stack: Type :=
 | stack_frame: Locals -> Stack -> stmt -> Stack
 .
 
-Inductive StackSteps: Lockenv -> Heap -> Stack ->
-                      Lockenv -> Heap -> Stack -> Prop :=
+Inductive StackSteps: Heap -> Stack ->
+                      Heap -> Stack -> Prop :=
 
-| stack_steps_stmt: forall le h loc stk s le' h' loc' s',
-     StmtSteps le h loc s
-               le' h' loc' s' ->
-     StackSteps le h (stack_frame loc stk s)
-                le' h' (stack_frame loc' stk s')
+| stack_steps_stmt: forall h loc stk s h' loc' s',
+     StmtSteps h loc s
+               h' loc' s' ->
+     StackSteps h (stack_frame loc stk s)
+                h' (stack_frame loc' stk s')
 
-| stack_steps_call_final: forall h le loc stk x proc arg,
+| stack_steps_call_final: forall h loc stk x proc arg,
      (* gross but avoids duplicating the call frame logic *)
-     StackSteps le h (stack_frame loc stk (s_call x proc arg))
-                le h (stack_frame loc stk (s_seq (s_call x proc arg) s_skip))
+     StackSteps h (stack_frame loc stk (s_call x proc arg))
+                h (stack_frame loc stk (s_seq (s_call x proc arg) s_skip))
 
 | stack_steps_call_seq: forall
-                            le h loc stk s s2
+                            h loc stk s s2
                             rt retid pt paramid decls body arg argval
                             s' new'loc,
      (* restrict the form of the call statement *)
@@ -217,15 +269,15 @@ Inductive StackSteps: Lockenv -> Heap -> Stack ->
                    new'loc ->
 
      (* make a new frame to evaluate the procedure body *)
-     StackSteps le h (stack_frame loc stk s)
-                le h (stack_frame new'loc (stack_frame loc stk s') body)
+     StackSteps h (stack_frame loc stk s)
+                h (stack_frame new'loc (stack_frame loc stk s') body)
 
-| stack_steps_return_seq: forall le h loc stk e s2,
+| stack_steps_return_seq: forall h loc stk e s2,
      (* return followed by crap is just return *)
-     StackSteps le h (stack_frame loc stk (s_seq (s_return e) s2))
-                le h (stack_frame loc stk (s_return e))
+     StackSteps h (stack_frame loc stk (s_seq (s_return e) s2))
+                h (stack_frame loc stk (s_return e))
 
-| stack_steps_return_final: forall le h
+| stack_steps_return_final: forall h
                                 loc loc' stk' s' s''
                                 rt ret retval
                                 x ejunk,
@@ -239,8 +291,8 @@ Inductive StackSteps: Lockenv -> Heap -> Stack ->
      s'' = s_assign x (e_value rt retval) ->
 
      (* pop the frame *)
-     StackSteps le h (stack_frame loc (stack_frame loc' stk' s') (s_return ret))
-                le h (stack_frame loc' stk' s'')
+     StackSteps h (stack_frame loc (stack_frame loc' stk' s') (s_return ret))
+                h (stack_frame loc' stk' s'')
 .
 
 (* this is its own thing because it needs a different signature *)
@@ -271,11 +323,11 @@ Inductive Thread: Type :=
 | thread: Stack -> Thread
 .
 
-Inductive ThreadSteps: Lockenv -> Heap -> Thread ->
-                       Lockenv -> Heap -> Thread -> Prop :=
-| thread_steps: forall le h s le' h' s',
-     StackSteps le h s le' h' s' -> 
-     ThreadSteps le h (thread s) le' h' (thread s')
+Inductive ThreadSteps: Heap -> Thread ->
+                       Heap -> Thread -> Prop :=
+| thread_steps: forall h s h' s',
+     StackSteps h s h' s' -> 
+     ThreadSteps h (thread s) h' (thread s')
 .
 
 Inductive ThreadStepsStart: Thread -> Thread -> Thread -> Prop :=
@@ -298,7 +350,7 @@ End Threads.
 Section Machines.
 
 Inductive Machine: Type :=
-| machine: Lockenv -> Heap -> list Thread -> Machine
+| machine: Heap -> list Thread -> Machine
 .
 
 (*
@@ -307,18 +359,18 @@ Inductive Machine: Type :=
  *)
 
 Inductive MachineSteps: Machine -> Machine -> Prop :=
-| machine_steps_plain: forall le h t le' h' t' ts1 ts2,
-     ThreadSteps le h t le' h' t' ->
-     MachineSteps (machine le h (ts1 ++ [t] ++ ts2))
-                  (machine le' h' (ts1 ++ [t'] ++ ts2))
-| machine_steps_start: forall le h t t1 t2 ts1 ts2,
+| machine_steps_plain: forall h t h' t' ts1 ts2,
+     ThreadSteps h t h' t' ->
+     MachineSteps (machine h (ts1 ++ [t] ++ ts2))
+                  (machine h' (ts1 ++ [t'] ++ ts2))
+| machine_steps_start: forall h t t1 t2 ts1 ts2,
      ThreadStepsStart t t1 t2 ->
-     MachineSteps (machine le h (ts1 ++ [t] ++ ts2))
-                  (machine le h (ts1 ++ [t1; t2] ++ ts2))
-| machine_steps_exit: forall le h t ts1 ts2,
+     MachineSteps (machine h (ts1 ++ [t] ++ ts2))
+                  (machine h (ts1 ++ [t1; t2] ++ ts2))
+| machine_steps_exit: forall h t ts1 ts2,
      ThreadDone t ->
-     MachineSteps (machine le h (ts1 ++ [t] ++ ts2))
-                  (machine le h (ts1 ++ ts2))
+     MachineSteps (machine h (ts1 ++ [t] ++ ts2))
+                  (machine h (ts1 ++ ts2))
 .
 
 End Machines.

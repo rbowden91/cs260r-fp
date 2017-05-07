@@ -40,6 +40,7 @@ Require Import varmap.
 (* scoping *)
 Inductive VarsScopedExpr: forall (t: type), VarMap type -> expr -> Prop :=
 | vars_scoped_value: forall (t: type) env k,
+     type_of_value k = t ->
      VarsScopedExpr t env (e_value t k)
 | vars_scoped_read: forall (t: type) env id,
      VarMapMapsTo (mkvar t id) t env ->
@@ -65,13 +66,14 @@ Inductive VarsScopedStmt: VarMap type -> stmt -> VarMap type -> Prop :=
      VarsScopedExpr t env e ->
      VarMapMapsTo (mkvar t id) t env ->
      VarsScopedStmt env (s_assign t (mkvar t id) e) env
-| vars_scoped_load: forall t env id l,
+| vars_scoped_load: forall t env id e,
+     VarsScopedExpr (t_addr t) env e ->
      VarMapMapsTo (mkvar t id) t env ->
-     VarsScopedStmt env (s_load t (mkvar t id) l) env
-| vars_scoped_store: forall t env id l e,
-     @VarMapMapsTo type (mkvar t id) t env ->
+     VarsScopedStmt env (s_load t (mkvar t id) e) env
+| vars_scoped_store: forall t env lid e,
+     VarMapMapsTo (mkvar (t_addr t) lid) (t_addr t) env ->
      VarsScopedExpr t env e ->
-     VarsScopedStmt env (s_store t l e) env
+     VarsScopedStmt env (s_store t (mkvar (t_addr t) lid) e) env
 | vars_scoped_scope: forall env s env',
      VarsScopedStmt env s env' ->
      VarsScopedStmt env (s_scope s) env

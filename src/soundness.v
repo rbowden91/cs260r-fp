@@ -25,7 +25,7 @@ Require Import semantics.
 Definition localenv_sound_new (tyenv: VarMap type) (env: Locals): Prop :=
    forall t id,
       VarMapMapsTo (mkvar t id) t tyenv ->
-      exists a, NatMap.MapsTo id (mkval t a) env.
+      exists a, NatMap.MapsTo id (mkval t a) env /\ type_of_value a = t.
 
 Definition localenv_sound (env: Locals) (prog : stmt): Prop :=
   forall t name,
@@ -228,6 +228,7 @@ Admitted.
 
 Lemma localenv_sound_addition:
    forall tyenv loc t id a,
+   type_of_value a = t ->
    localenv_sound_new tyenv loc ->
    ~(VarMapIn (mkvar t id) tyenv) ->
    localenv_sound_new
@@ -238,29 +239,31 @@ Proof.
    intros.
    destruct (Nat.eq_dec id0 id).
    - subst.
-     assert (t0 = t) by
+     assert (type_of_value a = t0).
         (unfold VarMapMapsTo in *;
          unfold VarMap_add in *;
          unfold var_id in *;
-         rewrite varmap.NatMapFacts.add_mapsto_iff in H1;
-         destruct H1 as [H1 | H1]; destruct H1;
+         rewrite varmap.NatMapFacts.add_mapsto_iff in H2;
+         destruct H2 as [H2 | H2]; destruct H2;
          try contradiction; auto).
      subst.
      exists a.
-     apply NatMap.add_1.
-     auto.
+     split; auto.
+     apply NatMap.add_1; auto.
    - unfold VarMapMapsTo in *.
      unfold VarMap_add in *.
      unfold var_id in *.
-     rewrite varmap.NatMapFacts.add_neq_mapsto_iff in H1; auto.
-     apply H in H1.
-     destruct H1 as [a0 H1].
+     rewrite varmap.NatMapFacts.add_neq_mapsto_iff in H2; auto.
+     apply H0 in H2.
+     destruct H2 as [a0 [H2a H2b]].
      exists a0.
+     split; auto.
      apply NatMap.add_2; auto.
 Qed.
 
 Lemma localenv_sound_replacement:
    forall tyenv loc t id a,
+   type_of_value a = t ->
    localenv_sound_new tyenv loc ->
    VarMapMapsTo (mkvar t id) t tyenv ->
    localenv_sound_new tyenv (NatMap.add id (mkval t a) loc).
@@ -269,25 +272,64 @@ Proof.
    intros.
    destruct (Nat.eq_dec id0 id).
    - subst.
-     assert (t0 = t) by
+     assert (type_of_value a = t0) by
         (unfold VarMapMapsTo in *;
         unfold var_id in *;
         unfold VarMap in tyenv;
         apply varmap.NatMapFacts.MapsTo_fun with (m := tyenv) (x := id);
         auto).
      subst.
-     specialize H with (t := t) (id := id).
-     apply H in H0.
-     destruct H0 as [a0 H0].
+     specialize H0 with (t := type_of_value a) (id := id).
+     apply H0 in H1.
+     destruct H1 as [a0 H1].
      exists a.
+     split; auto.
      apply NatMap.add_1.
      auto.
-   - specialize H with (t := t0) (id := id0).
-     apply H in H1.
-     destruct H1 as [a0 H1].
+   - specialize H0 with (t := t0) (id := id0).
+     apply H0 in H2.
+     destruct H2 as [a0 [H2a H2b]].
      exists a0.
+     split; auto.
      apply NatMap.add_2; auto.
 Qed.
+
+(* XXX this should be put somewhere else *)
+Lemma type_dec:
+   forall (t1 t2: type),
+   {t1 = t2} + {t1 <> t2}.
+Proof.
+   intro.
+   induction t1; intros.
+   1-3: destruct t2; subst; auto; right; discriminate.
+   - induction t2; subst.
+     1-3,5-7: right; discriminate.
+     destruct IHt1_1 with (t2 := t2_1);
+       destruct IHt1_2 with (t2 := t2_2);
+       subst; auto; right; congruence.
+   - induction t2; subst.
+     1-4,6-7: right; discriminate.
+     destruct IHt1 with (t2 := t2);
+        subst; auto; right; congruence.
+   - induction t2; subst.
+     1-5,7: right; discriminate.
+     destruct IHt1 with (t2 := t2);
+        subst; auto; right; congruence.
+   - induction t2; subst.
+     1-6: right; discriminate.
+     destruct IHt1 with (t2 := t2);
+        subst; auto; right; congruence.
+Qed.
+
+(* XXX this too *)
+Lemma expr_yields_typed_value:
+   forall t tyenv e l a,
+   VarsScopedExpr t tyenv e -> ExprYields t l e a ->
+   type_of_value a = t.
+Proof.
+   intros; induction H0; inversion H; subst; auto.
+Qed.
+
 
 Lemma StmtStepsPreserves_new :
   forall tyenv tyenv2 h l s,
@@ -318,15 +360,17 @@ Proof.
     { apply vars_scoped_block_nil. }
     inversion H1; subst.
     apply localenv_sound_replacement; auto.
+    apply expr_yields_typed_value with (tyenv := tyenv2) (l := loc) (e := e); auto.
   - exists tyenv2.
     split.
     { apply vars_scoped_block_nil. }
-    inversion H3; subst.
+    inversion H2; subst.
     apply localenv_sound_replacement; auto.
+    admit. (* currently don't have types from heap values *)
   - exists tyenv2.
     split.
     { apply vars_scoped_block_nil. }
-    inversion H3; subst; auto.
+    inversion H2; subst; auto.
   - exists tyenv2.
     inversion H; subst.
     split; auto.
@@ -419,32 +463,6 @@ Lemma MachineStepsPreserves_new:
 Proof.
 Admitted.
 
-(* XXX this should be put somewhere else *)
-Lemma type_dec:
-   forall (t1 t2: type),
-   {t1 = t2} + {t1 <> t2}.
-Proof.
-   intro.
-   induction t1; intros.
-   1-3: destruct t2; subst; auto; right; discriminate.
-   - induction t2; subst.
-     1-3,5-7: right; discriminate.
-     destruct IHt1_1 with (t2 := t2_1);
-       destruct IHt1_2 with (t2 := t2_2);
-       subst; auto; right; congruence.
-   - induction t2; subst.
-     1-4,6-7: right; discriminate.
-     destruct IHt1 with (t2 := t2);
-        subst; auto; right; congruence.
-   - induction t2; subst.
-     1-5,7: right; discriminate.
-     destruct IHt1 with (t2 := t2);
-        subst; auto; right; congruence.
-   - induction t2; subst.
-     1-6: right; discriminate.
-     destruct IHt1 with (t2 := t2);
-        subst; auto; right; congruence.
-Qed.
 
 Lemma ExprStepsProgress_new:
   forall t tyenv l e,
@@ -452,17 +470,17 @@ Lemma ExprStepsProgress_new:
     localenv_sound_new tyenv l ->
     exists a, ExprYields t l e a.
 Proof.
-   intros. revert H H0. revert tyenv l.
+   intros. revert H H0. revert tyenv l t.
    (*remember e as e1. revert Heqe1. revert e1.*)
    induction e; intros.
-   - subst. exists v. apply value_yields.
+   - subst. exists v. inversion H; subst. apply value_yields.
    - subst. inversion H; subst.
      unfold localenv_sound_new in H0.
      apply H0 in H4.
-     destruct H4 as [a H4].
+     destruct H4 as [a [H4a H4b]].
      exists a.
      apply read_yields with (id := id); auto.
-     apply NatMap.find_1.
+     all: apply NatMap.find_1.
      auto.
    - (*
       * This case seems to demand decidable equality on types. This failed badly
@@ -472,26 +490,41 @@ Proof.
       * Update: dependent destruction fixes this too.
       *)
      inversion H.
+(* no longer needed with the change away from explicitly typed exprs *)
+(*
      (* make the existT rubbish go away *)
      apply Eqdep_dec.inj_pair2_eq_dec in H2; try apply type_dec.
      apply Eqdep_dec.inj_pair2_eq_dec in H3; try apply type_dec.
+*)
      subst.
+     remember H6 as H7; clear HeqH7.
      apply IHe1 with (l := l) in H6; auto.
-     apply IHe2 with (l := l) in H7; auto.
-     apply IHe3 with (l := l) in H8; auto.
+     apply IHe2 with (l := l) in H8; auto.
+     apply IHe3 with (l := l) in H9; auto.
      destruct H6 as [pred H6].
-     destruct H7 as [vt H7].
-     destruct H8 as [vf H8].
+     destruct H8 as [vt H8].
+     destruct H9 as [vf H9].
+(* no longer needed either *)
+(*
      (*
       * now we have a fatal problem where extracting the bool from inside the
       * value t_bool loses the connection between the bool and the value, so
       * destructing the bool leaves you stuck. aha: "dependent destruction"
-      * fixes this.
+      * fixes this. (note later: also see "dependent rewrite".
       *)
      dependent destruction pred.
      destruct b;
         [exists vt; apply cond_true_yields | exists vf; apply cond_false_yields];
         auto.
+*)
+   remember H6 as H6a. clear HeqH6a.
+   apply expr_yields_typed_value with (tyenv := tyenv) in H6; auto.
+   destruct pred.
+   1-2,4-5,8: unfold type_of_value in H6; discriminate.
+   2,3: unfold type_of_value in H6; destruct a; discriminate.
+   destruct b.
+   * exists vt. apply cond_true_yields; auto.
+   * exists vf. apply cond_false_yields; auto.
 Qed.
 
 Lemma StmtStepsProgress_new:
@@ -514,12 +547,9 @@ Proof.
   - inversion H; subst.
     apply ExprStepsProgress_new with (l := l) in H10; auto.
     destruct H10 as [a H10].
-    remember v as v1.
-    destruct v1.
-    exists h, (NatMap.add n (mkval t a) l), s_skip.
-    apply step_assign with (h := h) (loc := l) (id := n) (type := t) (e := e) (a := a).
-    assert (e1 = e) by admit.
-    subst; auto.
+    exists h, (NatMap.add id (mkval t a) l), s_skip.
+    apply step_assign with (h := h) (loc := l) (id := id) (type := t) (e := e) (a := a).
+    auto.
   - (* TBD *)
     admit.
   - admit.

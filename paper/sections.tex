@@ -119,7 +119,7 @@ rules for both acquiring and releasing a lock. Loosely, the rules look like:
     \infer{\hoaretrip{(\ell \mapsto R) * R}{\texttt{putlock}(\ell)}{\ell \mapsto R}}{}
 \end{align*}
 
-Here, $R$ represents an assertion (a predicate on the heap). There is messiness
+Here, $R$ represents an assertion (a ``predicate on the heap''). There is messiness
 with what exactly it means for a predicate (something meant just for the logic)
 to live in the heap.\footnote{Our logic currently gets around this by not allowing for
 dynamic lock creation and deletion.} But that issue aside, intuitively,
@@ -630,17 +630,62 @@ address.
 
 Our logic has been formalized in the Coq proof assistant.
 
+
 \section{Future Work}
 
-% {SI} {WI} {A}
-% dynamic lock invariants? Adding invariants?
-% lock invariant is backwards
-% Parameterized locks?
+% XXX Lemma about strong invariants always holding??
 
-It might have been possible to avoid going completely imperative and model heap
-store/load after FSCQ's disk read/write.  It was only recently we restricted
+The final goal is to use our concurrent crash Hoare logic to prove data-race
+freedom and functional correctness of a concurrent crash file system. But first,
+we still need to fully prove the logic sound according to the semantics of our
+imperative language.
+
+That said, our logic and language must be extended in multiple ways to more
+fully model a concurrent file system. First, it is necessary to add in a
+permission model to allow for multiple readers of a heap address.  For file
+system purposes, this is strictly necessary in order to reason about multiple
+concurrent threads sharing pointers to the same locks.
+
+Additionally, our language does not currently include any dynamic heap
+allocation, include malloc, free, lock creation, and lock deletion. These are
+necessary to be able to correctly model operations such as file system mount and
+unmount. A fundamental issue is that, traditionally, dynamic locks introduce the
+aforementioned issue of ``predicates on the heap''. Once locks are dynamic and
+predicates are placed on the heap, we lose the power to reason about what global
+invariants a program must abide, and as such, can no longer reason about a
+consistent state for recovery to act upon.
+
+We have toyed with the idea that a solution to this problem is to give each lock
+an explicit type, and all locks of a given type must share the same resource
+invariant (parameterized by the address of the resource that the lock is
+protecting). That way, we no longer have predicates on the heap, and the
+$(L^c,L^r)$ mapping to the left of $\vDash$, parameterized by both lock type and
+address, once again contains all possible strong invariants.
+
+As mentioned earlier, there is an alternative frame rule that combines the two
+frame rules that we currently have that we have not yet implemented. A related
+issue is that any resource pulled into the pre-condition must also be pulled
+into the crash pre-condition, though the actual constraints (weak vs strong)
+can differ between the two. Once dynamic memory is implemented, it seems to make
+even less sense for something like $\exists (x:vnode), 10\mapsto x$ to appear in
+a strong invariant, since $10$ can be deallocated and reallocated.
+
+Our proposed solution to this problem is to combine the crash conditions into
+the regular conditions, and directly tag an address with both the weak and
+strong invariants that it must abide by (according to the lock type that
+protects the address). The strong invariant must be respected whenever we store
+to that address, and the weak invariant must be respected whenever we attempt to
+release the lock protecting that address. Now, we have an even simpler frame
+rule that can frame anything out of the current state, since framing out an
+address automatically frames out both the strong and weak invariants associated
+with it.
+
+As an aside, it might have been possible to avoid making the language completely
+imperative by just extending FSCQ's disk read and write operations with lock and
+heap operations. It was only recently we realized it made sense to restrict
 crash resource invariants to only describe precisely the resource that the lock
-protects. Alloc/malloc/dynamic locks
+protects. The fundamental concurrent crash Hoare logic remains the same, but we
+could potentially use Coq values directly.
 
 \section{Conclusions}
 

@@ -338,7 +338,9 @@ Admitted.
 
 Definition ThreadStateSound tyenv t :=
    match t with
-   | thread loc stk s =>
+   | thread (stack_empty) => False
+   | thread (stack_pending _ _ _) => False
+   | thread (stack_top loc stk s) =>
         VarsScopedStmt tyenv s /\
         localenv_sound_new tyenv loc (* /\
         stack_sound tyenv stk *)
@@ -352,6 +354,7 @@ Lemma ThreadStepsPreserves_new:
          ThreadStateSound tyenv t'.
 Proof.
    intros.
+   destruct H0.
    induction H0.
    - unfold ThreadStateSound in *.
      destruct H as [H1 H2].
@@ -494,15 +497,17 @@ Proof.
   - admit.
 Admitted.
 
-Definition threadstmt (t: Thread) :=
+Definition threadstmt_is (t: Thread) s0 :=
    match t with
-   | thread loc stk s => s
+   | thread (stack_empty) => False
+   | thread (stack_pending _ _ _) => False
+   | thread (stack_top loc stk s) => s = s0
    end.
 
 Lemma ThreadStepsProgress_new:
    forall tyenv h t,
       ThreadStateSound tyenv t ->
-      (forall p arg, threadstmt t = s_start p arg -> False) ->
+      (forall p arg, threadstmt_is t (s_start p arg) = False) ->
       exists h' t',
          ThreadSteps h t h' t'.
 Proof.
@@ -511,7 +516,7 @@ Admitted.
 Lemma ThreadStepsStartProgress_new:
    forall tyenv t,
       ThreadStateSound tyenv t ->
-      (exists p arg, threadstmt t = s_start p arg) ->
+      (exists p arg, threadstmt_is t (s_start p arg)) ->
       exists t' tnew,
          ThreadStepsStart t t' tnew.
 Proof.

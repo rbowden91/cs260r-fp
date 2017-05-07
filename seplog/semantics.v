@@ -143,6 +143,7 @@ Section Stacks.
 Inductive Stack: Type :=
 | stack_empty: Stack
 | stack_pending: Locals -> var -> Stack -> Stack
+| stack_top: Locals -> Stack -> stmt -> Stack
 .
 
 Inductive CallSteps: Stack -> Locals -> stmt ->
@@ -168,6 +169,40 @@ Inductive ReturnSteps: Stack -> Locals -> stmt ->
                  stk loc' (s_assign (mkvar rt retid) (e_value rt retval))
 .
 
+Inductive StackSteps: Heap -> Stack -> Heap -> Stack -> Prop :=
+| stack_steps_stmt: forall h loc stk s h' loc' s',
+     StmtSteps h loc s h' loc' s' ->
+     StackSteps h (stack_top loc stk s) h' (stack_top loc' stk s')
+| stack_steps_call_final: forall h loc stk s loc' stk' s',
+     CallSteps stk loc s stk' loc' s' ->
+     StackSteps h (stack_top loc stk s)
+		 h (stack_top loc' stk' s')
+| stack_steps_call_seq: forall h loc stk s s2 loc' stk' s',
+     CallSteps stk loc s stk' loc' s' ->
+     StackSteps h (stack_top loc stk (s_seq s s2))
+		 h (stack_top loc' stk' (s_seq s' s2))
+| stack_steps_return_final: forall h loc stk s loc' stk' s',
+     ReturnSteps stk loc s stk' loc' s' ->
+     StackSteps h (stack_top loc stk s)
+		 h (stack_top loc' stk' s')
+| stack_steps_return_seq: forall h loc stk s s2 loc' stk' s',
+     ReturnSteps stk loc s stk' loc' s' ->
+     StackSteps h (stack_top loc stk (s_seq s s2))
+		 h (stack_top loc' stk' s')
+.
+
+(* this is its own thing because it needs a different signature *)
+(* XXX make sure the constraint that started procs return unit gets into the types *)
+Inductive StackStepsStart: Stack -> Stack -> Stack -> Prop :=
+| stack_steps_start: forall pt loc stk proc arg newloc argval,
+     ExprYields pt loc arg argval ->
+     newloc = NatMap.add 0 v_unit (NatMap.empty value) ->
+     StackStepsStart
+	      (stack_top loc stk (s_start proc arg))
+        (stack_top loc stk s_skip)
+        (stack_top newloc stack_empty (s_call (mkvar t_unit 0) proc (e_value pt argval)))
+.
+
 End Stacks.
 
 (**************************************************************)	
@@ -176,41 +211,19 @@ End Stacks.
 Section Threads.
 
 Inductive Thread: Type :=
-| thread: Locals -> Stack -> stmt -> Thread
+| thread: Stack -> Thread
 .
 
 Inductive ThreadSteps: Heap -> Thread -> Heap -> Thread -> Prop :=
-| thread_steps_stmt: forall h loc stk s h' loc' s',
-     StmtSteps h loc s h' loc' s' ->
-     ThreadSteps h (thread loc stk s) h' (thread loc' stk s')
-| thread_steps_call_final: forall h loc stk s loc' stk' s',
-     CallSteps stk loc s stk' loc' s' ->
-     ThreadSteps h (thread loc stk s)
-		 h (thread loc' stk' s')
-| thread_steps_call_seq: forall h loc stk s s2 loc' stk' s',
-     CallSteps stk loc s stk' loc' s' ->
-     ThreadSteps h (thread loc stk (s_seq s s2))
-		 h (thread loc' stk' (s_seq s' s2))
-| thread_steps_return_final: forall h loc stk s loc' stk' s',
-     ReturnSteps stk loc s stk' loc' s' ->
-     ThreadSteps h (thread loc stk s)
-		 h (thread loc' stk' s')
-| thread_steps_return_seq: forall h loc stk s s2 loc' stk' s',
-     ReturnSteps stk loc s stk' loc' s' ->
-     ThreadSteps h (thread loc stk (s_seq s s2))
-		 h (thread loc' stk' s')
+| thread_steps: forall h s h' s',
+     StackSteps h s h' s' -> 
+     ThreadSteps h (thread s) h' (thread s')
 .
 
-(* this is its own thing because it needs a different signature *)
-(* XXX make sure the constraint that started procs return unit gets into the types *)
 Inductive ThreadStepsStart: Thread -> Thread -> Thread -> Prop :=
-| thread_steps_start: forall pt loc stk proc arg newloc argval,
-     ExprYields pt loc arg argval ->
-     newloc = NatMap.add 0 v_unit (NatMap.empty value) ->
-     ThreadStepsStart
-	      (thread loc stk (s_start proc arg))
-        (thread loc stk s_skip)
-        (thread newloc stack_empty (s_call (mkvar t_unit 0) proc (e_value pt argval)))
+| thread_steps_start: forall s s' s2,
+     StackStepsStart s s' s2 -> 
+     ThreadStepsStart (thread s) (thread s') (thread s2)
 .
 
 End Threads.

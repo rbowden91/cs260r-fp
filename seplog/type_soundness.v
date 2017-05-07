@@ -20,13 +20,17 @@ Require Import semantics.
 Definition localenv_sound_new (tyenv: VarMap type) (env: Locals): Prop :=
    forall t id,
       VarMapMapsTo (mkvar t id) t tyenv ->
-      exists a, NatMap.MapsTo id (mkval t a) env /\ type_of_value a = t.
+      exists a, NatMap.MapsTo id a env /\ type_of_value a = t.
 
 Definition localenv_sound (env: Locals) (prog : stmt): Prop :=
   forall t name,
     StmtVarRespectsT t name prog ->
-    exists a, NatMap.find name env = Some (mkval t a).
+    exists a, NatMap.find name env = Some a.
+(* XXX I think this needs  /\ type_of_value a = t  but then the proofs don't work
+in ways I don't get *)
 
+(* these are part of using arbitrary coq values and not currently needed *)
+(*
 Lemma localenv_weaken (env: Locals) (prog: stmt):
    forall (t : type) name,
       localenv_sound env prog ->
@@ -56,39 +60,8 @@ Proof.
    rewrite H1 in H.
    injection H; auto.
 Qed.
-
-
-(*
-Lemma localenv_weaken_new (env: Locals) (prog: stmt):
-   forall tyenv tyenv' name,
-      localenv_sound_x env prog ->
-      VarsScopedStmt tyenv prog tyenv' ->
-      NatMap.find name env = None -> False.
-Proof.
-   intros.
-   unfold localenv_sound_x in H.
-   specialize H with (id := name) (tyenv := tyenv) (tyenv' := tyenv').
-   specialize (H H0).
-   destruct H as [a H].
-   rewrite H1 in H.
-   discriminate.
-Qed.
-
-Lemma localenv_weaken2_new (env: Locals) (prog: stmt):
-   forall tyenv tyenv' name,
-      localenv_sound_x env prog ->
-      VarsScopedStmt tyenv prog tyenv' ->
-      (forall t' a, NatMap.find name env = Some (mkval t' a) -> t' = t).
-Proof.
-   intros.
-   unfold localenv_sound in H.
-   specialize H with (t := t) (name := name).
-   specialize (H H0).
-   destruct H as [a' H].
-   rewrite H1 in H.
-   injection H; auto.
-Qed.
 *)
+
 
 (* preservation *)
 Lemma StmtStepsPreserves :
@@ -140,8 +113,8 @@ Proof.
   - split.
     + unfold localenv_sound in *.
       intros.
-      specialize (H0 t name).
-      inversion H0; subst.
+      specialize (H t name).
+      destruct (Nat.eq_dec id name).
       * exists a.
         rewrite NatMapFacts.add_eq_o; auto.
       * rewrite NatMapFacts.add_neq_o; auto.
@@ -154,6 +127,7 @@ Proof.
       * exists a.
         rewrite NatMapFacts.add_eq_o; auto.
       * rewrite NatMapFacts.add_neq_o; auto.
+        specialize (H t name). auto.
     + intros; constructor.
   - split.
     + unfold localenv_sound in *.
@@ -188,6 +162,9 @@ Proof.
       eauto.
     + intros.
       constructor.
+(* not sure what this is about *)
+Unshelve.
+all: auto.
 Qed.
 
 
@@ -217,7 +194,7 @@ Lemma localenv_sound_addition:
    ~(VarMapIn (mkvar t id) tyenv) ->
    localenv_sound_new
         (VarMap_add (mkvar t id) t tyenv)
-        (NatMap.add id (mkval t a) loc).
+        (NatMap.add id a loc).
 Proof.
    unfold localenv_sound_new.
    intros.
@@ -250,7 +227,7 @@ Lemma localenv_sound_replacement:
    type_of_value a = t ->
    localenv_sound_new tyenv loc ->
    VarMapMapsTo (mkvar t id) t tyenv ->
-   localenv_sound_new tyenv (NatMap.add id (mkval t a) loc).
+   localenv_sound_new tyenv (NatMap.add id a loc).
 Proof.
    unfold localenv_sound_new.
    intros.
@@ -331,21 +308,21 @@ Proof.
     apply IHStmtSteps in H5; auto.
     destruct H5 as [H5a H5b].
     split; auto.
-    apply vars_scoped_block_cons; auto.
+    apply vars_scoped_seq; auto.
   - inversion H; subst.
     split; auto.
   - split.
-    { apply vars_scoped_block_nil. }
+    { apply vars_scoped_skip. }
     inversion H1; subst.
-    apply localenv_sound_replacement; auto.
+    apply localenv_sound_replacement with (t := type); auto.
     apply expr_yields_typed_value with (tyenv := tyenv) (l := loc) (e := e); auto.
   - split.
-    { apply vars_scoped_block_nil. }
+    { apply vars_scoped_skip. }
     inversion H2; subst.
-    apply localenv_sound_replacement; auto.
+    apply localenv_sound_replacement with (t := type); auto.
     admit. (* currently don't have types from heap values *)
   - split.
-    { apply vars_scoped_block_nil. }
+    { apply vars_scoped_skip. }
     inversion H2; subst; auto.
   - inversion H1; subst.
     split; auto.
@@ -504,7 +481,7 @@ Proof.
   - inversion H; subst.
     apply ExprStepsProgress_new with (l := l) in H8; auto.
     destruct H8 as [a H8].
-    exists h, (NatMap.add id (mkval t a) l), s_skip.
+    exists h, (NatMap.add id a l), s_skip.
     apply step_assign with (h := h) (loc := l) (id := id) (type := t) (e := e) (a := a).
     auto.
   - admit.

@@ -37,7 +37,10 @@ Require Import varmap.
  * when checking for duplicate declarations, at least for now.
  *)
 
-(* scoping *)
+(*
+ * scoping
+ *)
+
 Inductive VarsScopedExpr: forall (t: type), VarMap type -> expr -> Prop :=
 | vars_scoped_value: forall (t: type) env k,
      type_of_value k = t ->
@@ -99,14 +102,16 @@ Inductive VarsScopedStmt: VarMap type -> stmt -> Prop :=
      VarsScopedStmt env (s_getlock (mkvar (t_lock t) id))
 with
 
-(*Inductive*) VarsScopedVardecl: VarMap type -> vardecl -> VarMap type -> Prop :=
+(*Inductive*) VarsScopedVardecl: VarMap type -> vardecl ->
+                                 VarMap type -> Prop :=
 | vars_scoped_vardecl: forall t env id e,
      VarsScopedExpr t env e ->
      ~(VarMapIn (mkvar t id) env) ->
      VarsScopedVardecl env (mkvardecl (mkvar t id) e) (VarMap_add (mkvar t id) t env)
 with
 
-(*Inductive*) VarsScopedVardecls: VarMap type -> list vardecl -> VarMap type -> Prop :=
+(*Inductive*) VarsScopedVardecls: VarMap type -> list vardecl ->
+                                  VarMap type -> Prop :=
 | vars_scoped_vardecls_nil: forall env,
      VarsScopedVardecls env [] env
 | vars_scoped_vardecls_cons: forall env decl env' decls env'',
@@ -123,12 +128,10 @@ with
      VarsScopedProc pt rt (mkproc rt (mkvar pt id) decls body)
 .
 
-(* XXX clear these out later *)
-Definition vars_scoped_block_nil := vars_scoped_skip.
-Definition vars_scoped_block_cons := vars_scoped_seq.
 
-
-(* uniqueness *)
+(*
+ * uniqueness
+ *)
 
 (*
  * This differs in that the environment doesn't nest. Also,
@@ -145,6 +148,7 @@ Inductive VarsUniqueStmt: stmt -> VarMap unit -> Prop :=
      VarMapDisjoint unit env env' ->
      VarsUniqueStmt (s_seq s1 s2) (VarMap_union env env')
 | vars_unique_start: forall p e,
+     VarsUniqueProc p ->
      VarsUniqueStmt (s_start p e) (VarMap_empty unit)
 | vars_unique_assign: forall x e,
      VarsUniqueStmt (s_assign x e) (VarMap_empty unit)

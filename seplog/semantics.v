@@ -43,11 +43,8 @@ Definition Heap := NatMap.t val.
 Definition Locals := NatMap.t val.
 *)
 
-(* XXX kill this off *)
-Inductive val: Type := mkval (t: type) (a : value): val.
-
-Definition Heap := NatMap.t val.
-Definition Locals := NatMap.t val.
+Definition Heap := NatMap.t value.
+Definition Locals := NatMap.t value.
 
 End Stores.
 
@@ -62,7 +59,7 @@ Inductive ExprYields: forall t, Locals -> expr -> value -> Prop :=
 | read_yields: forall loc t (x : var) id a,
     (* XXX tidy this *)
     type_of_value a = t ->
-    x = mkvar t id -> NatMap.find id loc = Some (mkval t a) ->
+    x = mkvar t id -> NatMap.find id loc = Some a ->
     ExprYields t loc (e_read x) a
 | cond_true_yields: forall t loc e et ef a,
     ExprYields t_bool loc e v_true ->
@@ -90,17 +87,17 @@ Inductive StmtSteps: Heap -> Locals -> stmt -> Heap -> Locals -> stmt -> Prop :=
      StmtSteps h loc (s_seq s_skip s2) h loc s2
 | step_assign: forall h loc id type e a,
      ExprYields type loc e a ->
-     StmtSteps h loc (s_assign (mkvar type id) e) h (NatMap.add id (mkval type a) loc) s_skip
+     StmtSteps h loc (s_assign (mkvar type id) e) h (NatMap.add id a loc) s_skip
 | step_load: forall h loc type lid e hid heapnum a,
      (* XXX this is wrong (needs to handle heapnum) *)
      ExprYields type loc e (v_addr (mkaddr type hid heapnum)) ->
-     NatMap.find hid h = Some (mkval type a) ->
-     StmtSteps h loc (s_load (mkvar type lid) e) h (NatMap.add lid (mkval type a) loc) s_skip
+     NatMap.find hid h = Some a ->
+     StmtSteps h loc (s_load (mkvar type lid) e) h (NatMap.add lid a loc) s_skip
 | step_store: forall h loc type lid e hid heapnum a,
      (* XXX this is wrong (needs to handle heapnum) *)
      ExprYields type loc e a ->
      ExprYields type loc (e_read (mkvar type lid)) (v_addr (mkaddr type hid heapnum)) ->
-     StmtSteps h loc (s_store (mkvar type lid) e) (NatMap.add hid (mkval type a) h) loc s_skip
+     StmtSteps h loc (s_store (mkvar type lid) e) (NatMap.add hid a h) loc s_skip
 | step_if_true: forall h loc e st sf,
      ExprYields t_bool loc e v_true ->
      StmtSteps h loc (s_if e st sf) h loc st
@@ -132,7 +129,7 @@ Inductive VardeclsSteps: Locals -> list vardecl -> Locals -> Prop :=
      VardeclsSteps loc [] loc
 | vardecls_steps_cons: forall loc t id e a decls loc',
      ExprYields t loc e a ->
-     VardeclsSteps (NatMap.add id (mkval t a) loc) decls loc' ->
+     VardeclsSteps (NatMap.add id a loc) decls loc' ->
      VardeclsSteps loc ((mkvardecl (mkvar t id) e) :: decls) loc'
 .
 
@@ -152,7 +149,7 @@ Inductive CallSteps: Stack -> Locals -> stmt ->
                      Stack -> Locals -> stmt -> Prop :=
 | call_steps: forall loc arg argval stk retid rt paramid pt decls newloc body,
      ExprYields pt loc arg argval ->
-     VardeclsSteps (NatMap.add paramid (mkval pt argval) (NatMap.empty val))
+     VardeclsSteps (NatMap.add paramid argval (NatMap.empty value))
                    decls
                    newloc ->
      CallSteps stk loc (s_call (mkvar rt retid)
@@ -210,7 +207,7 @@ Inductive ThreadSteps: Heap -> Thread -> Heap -> Thread -> Prop :=
 Inductive ThreadStepsStart: Thread -> Thread -> Thread -> Prop :=
 | thread_steps_start: forall pt loc stk proc arg newloc argval,
      ExprYields pt loc arg argval ->
-     newloc = NatMap.add 0 (mkval t_unit v_unit) (NatMap.empty val) ->
+     newloc = NatMap.add 0 v_unit (NatMap.empty value) ->
      ThreadStepsStart
 	      (thread loc stk (s_start proc arg))
         (thread loc stk s_skip)

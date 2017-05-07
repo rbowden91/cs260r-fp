@@ -339,8 +339,7 @@ Admitted.
 Definition ThreadStateSound tyenv t :=
    match t with
    | thread (stack_empty) => False
-   | thread (stack_pending _ _ _) => False
-   | thread (stack_top loc stk s) =>
+   | thread (stack_frame loc stk s) =>
         VarsScopedStmt tyenv s /\
         localenv_sound_new tyenv loc (* /\
         stack_sound tyenv stk *)
@@ -500,8 +499,7 @@ Admitted.
 Definition threadstmt_is (t: Thread) s0 :=
    match t with
    | thread (stack_empty) => False
-   | thread (stack_pending _ _ _) => False
-   | thread (stack_top loc stk s) => s = s0
+   | thread (stack_frame loc stk s) => s = s0
    end.
 
 Lemma ThreadStepsProgress_new:

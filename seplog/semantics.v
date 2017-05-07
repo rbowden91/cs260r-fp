@@ -140,6 +140,27 @@ Inductive Stack: Type :=
 | stack_pending: forall (t : type), Locals -> var -> Stack -> Stack
 .
 
+Inductive CallSteps: Stack -> Locals -> stmt ->
+                     Stack -> Locals -> stmt -> Prop :=
+| call_steps: forall loc stk retid rt paramid pt body arg argval,
+     ExprYields pt loc arg argval ->
+     CallSteps stk loc (s_call (mkvar rt retid)
+                               (mkproc rt (mkvar pt paramid) body)
+                               arg)
+               (stack_pending rt loc (mkvar rt retid) stk)
+               (NatMap.add paramid (mkval pt argval) (NatMap.empty val))
+               body
+.
+
+Inductive ReturnSteps: Stack -> Locals -> stmt ->
+                        Stack -> Locals -> stmt -> Prop :=
+| return_steps: forall loc loc' rt retid stk ret retval,
+     ExprYields rt loc ret retval ->
+     ReturnSteps (stack_pending rt loc' (mkvar rt retid) stk) loc
+                                                              (s_return ret)
+                 stk loc' (s_assign (mkvar rt retid) (e_value rt retval))
+.
+
 End Stacks.
 
 (**************************************************************)	
@@ -155,24 +176,22 @@ Inductive ThreadSteps: Heap -> Thread -> Heap -> Thread -> Prop :=
 | thread_steps_stmt: forall h loc stk s h' loc' s',
      StmtSteps h loc s h' loc' s' ->
      ThreadSteps h (thread loc stk s) h' (thread loc' stk s')
-| thread_steps_call: forall h loc stk retid rt paramid pt body arg argval,
-     ExprYields pt loc arg argval ->
-     ThreadSteps h (thread
-			loc
-			stk
-			(s_call (mkvar rt retid)
-				(mkproc rt (mkvar pt paramid) body)
-				arg)
-		 )
-		 h (thread
-			(NatMap.add paramid (mkval pt argval) (NatMap.empty val))
-			(stack_pending rt loc (mkvar rt retid) stk)
-			body
-		 )
-| thread_steps_return: forall h loc loc' rt retid stk ret retval retvalXXX,
-     ExprYields rt loc ret retval ->
-     ThreadSteps h (thread loc (stack_pending rt loc' (mkvar rt retid) stk) (s_return ret))
-                 h (thread loc' stk (s_assign (mkvar rt retid) (e_value rt retvalXXX)))
+| thread_steps_call_final: forall h loc stk s loc' stk' s',
+     CallSteps stk loc s stk' loc' s' ->
+     ThreadSteps h (thread loc stk s)
+		 h (thread loc' stk' s')
+| thread_steps_call_seq: forall h loc stk s s2 loc' stk' s',
+     CallSteps stk loc s stk' loc' s' ->
+     ThreadSteps h (thread loc stk (s_seq s s2))
+		 h (thread loc' stk' (s_seq s' s2))
+| thread_steps_return_final: forall h loc stk s loc' stk' s',
+     ReturnSteps stk loc s stk' loc' s' ->
+     ThreadSteps h (thread loc stk s)
+		 h (thread loc' stk' s')
+| thread_steps_return_seq: forall h loc stk s s2 loc' stk' s',
+     ReturnSteps stk loc s stk' loc' s' ->
+     ThreadSteps h (thread loc stk (s_seq s s2))
+		 h (thread loc' stk' s')
 .
 
 (* this is its own thing because it needs a different signature *)

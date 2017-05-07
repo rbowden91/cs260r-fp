@@ -65,9 +65,10 @@ Inductive ExprYields: forall t, Locals -> expr -> value -> Prop :=
 | value_yields: forall loc t a,
     ExprYields t loc (e_value t a) a
 | read_yields: forall loc t (x : var) id a,
+    (* XXX tidy this *)
     type_of_value a = t ->
     x = mkvar t id -> NatMap.find id loc = Some (mkval t a) ->
-    ExprYields t loc (e_read t x) a
+    ExprYields t loc (e_read x) a
 | cond_true_yields: forall t loc e et ef a,
     ExprYields t_bool loc e v_true ->
     ExprYields t loc et a ->
@@ -103,7 +104,7 @@ Inductive StmtSteps: Heap -> Locals -> stmt -> Heap -> Locals -> stmt -> Prop :=
 | step_store: forall h loc type lid e hid heapnum a,
      (* XXX this is wrong *)
      ExprYields type loc e a ->
-     ExprYields type loc (e_read type (mkvar type lid)) (v_addr (mkaddr type hid heapnum)) ->
+     ExprYields type loc (e_read (mkvar type lid)) (v_addr (mkaddr type hid heapnum)) ->
      StmtSteps h loc (s_store type (mkvar type lid) e) (NatMap.add hid (mkval type a) h) loc s_skip
 | step_scope: forall h loc s h' loc' s',
      StmtSteps h loc s h' loc' s' ->

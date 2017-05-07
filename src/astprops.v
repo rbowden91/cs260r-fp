@@ -44,7 +44,7 @@ Inductive VarsScopedExpr: forall (t: type), VarMap type -> expr -> Prop :=
      VarsScopedExpr t env (e_value t k)
 | vars_scoped_read: forall (t: type) env id,
      VarMapMapsTo (mkvar t id) t env ->
-     VarsScopedExpr t env (e_read t (mkvar t id))
+     VarsScopedExpr t env (e_read (mkvar t id))
 | vars_scoped_cond: forall t env pred te fe,
      VarsScopedExpr t_bool env pred ->
      VarsScopedExpr t env te ->
@@ -181,8 +181,8 @@ with
 
 (* variable gets read by an expression *)
 Inductive InExpr : forall t, var -> expr -> Prop :=
-| inexpr_read : forall t v,
-    InExpr t v (e_read t v)
+| inexpr_read : forall t id,
+    InExpr t (mkvar t id) (e_read (mkvar t id))
 | inexpr_cond : forall t v b e1 e2,
     InExpr t v e1 -> InExpr t v e2 -> InExpr t v (e_cond t b e1 e2)
 .
@@ -237,9 +237,9 @@ Inductive ExprVarRespectsT (t : type) (s : varidtype) : forall t', expr -> Prop 
 | evrt_value : forall t' exp,
     ExprVarRespectsT t s t' (e_value t' exp)
 | evrt_read_eq : (* expr type had better be the same *)
-    ExprVarRespectsT t s t (e_read t (mkvar t s))
+    ExprVarRespectsT t s t (e_read (mkvar t s))
 | evrt_read_neq : forall t' s', (* don't care about expr type *)
-    s <> s' -> ExprVarRespectsT t s t' (e_read t' (mkvar t' s'))
+    s <> s' -> ExprVarRespectsT t s t' (e_read (mkvar t' s'))
 | evrt_cond : forall t' b exp1 exp2,
     ExprVarRespectsT t s t_bool b -> ExprVarRespectsT t s t' exp1 -> ExprVarRespectsT t s t' exp2 ->
     ExprVarRespectsT t s t' (e_cond t' b exp1 exp2)

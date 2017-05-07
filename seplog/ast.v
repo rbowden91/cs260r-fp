@@ -45,15 +45,27 @@ Inductive addr: Type :=
 .
 
 Inductive value : Type :=
-| v_unit
-| v_nat (n:nat)
-| v_bool (b:bool)
-| v_pair (a:value) (b:value)
-| v_list (l:type * (list value))
-| v_addr (a:addr)
-| v_lock (a:addr)
-| v_undef
+| v_unit: value
+| v_nat  (n: nat): value
+| v_bool (b: bool): value
+| v_pair (a: value) (b: value): value
+| v_list (t: type) (l: list value): value
+| v_addr (a: addr): value
+| v_lock (a: addr): value
+| v_undef: value
 .
+
+Function type_of_value (v: value): type :=
+   match v with
+   | v_unit => t_unit
+   | v_nat _ => t_nat
+   | v_bool _ => t_bool
+   | v_pair a b => t_pair (type_of_value a) (type_of_value b)
+   | v_list t l => t
+   | v_addr (mkaddr ty _ _) => ty
+   | v_lock (mkaddr ty _ _) => ty
+   | v_undef => t_unit (* XXX *)
+   end.
 
 Inductive invariant : Type :=
 (* Just an example *)
@@ -66,7 +78,7 @@ Inductive invariant : Type :=
 Inductive expr: Type :=
 | e_value: value -> expr
 | e_read: var -> expr
-| e_cond: expr -> expr -> expr -> expr
+| e_cond: type -> expr -> expr -> expr -> expr
 .
 
 (*

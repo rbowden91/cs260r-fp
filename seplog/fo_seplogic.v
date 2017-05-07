@@ -13,12 +13,36 @@ Require Import ast.
 Require Import List.
 Import ListNotations.
 
-Require Import table.
+Require Import OrderedType OrderedTypeEx.
+Require FMapList.
+Require FMapFacts.
+Module NatMap := FMapList.Make Nat_as_OT.
+Module NatMapFacts := FMapFacts.WFacts_fun Nat_as_OT NatMap.
 
-Definition env := table var value.
-Definition state := table addr value.
 
+Definition env := NatMap.t value.
+Definition state := NatMap.t value.
 
+(* convenient functions for working with env *)
+Definition get_locals (rho : env) (v : var) : option value :=
+  match v with
+  | mkvar t n => NatMap.find n rho
+  end.
+Definition set_locals (v : var) (val : value) (rho : env) : env :=
+  match v with
+  | mkvar t n => NatMap.add n val rho
+  end.
+
+(*
+Definition get_heap (rho : env) (a : addr) : option value :=
+  match a with
+  | mkaddr t n b => NatMap.find n rho
+  end.
+Definition set_heap (a : addr) (val : value) (rho : env) : env :=
+  match a with
+  | mkaddr t n b => NatMap.add n val rho
+  end.
+*)
 
 Definition world := (addr -> option value)%type.
 
@@ -45,13 +69,13 @@ Instance Nw: NatDed (pred world) := _.
 
 Definition assertion := env -> pred world.
 
-Definition den (s: state) : world := (table_get s).
+(* Definition den (s: state) : world := get_heap s. *)
 
 Definition defined (x: var) : assertion :=
-   fun rho => fun w => exists v, table_get rho x = Some v.
+   fun rho => fun w => exists v, get_locals rho x = Some v.
 
 Definition subst (x : var) (y : value) (P: assertion) : assertion :=
-   fun rho => fun w => P (table_set x y rho) w.
+   fun rho => fun w => P (set_locals x y rho) w.
 
 Definition mapsto (x:addr) (y:value) : pred world :=
  fun w =>
@@ -87,25 +111,25 @@ Inductive modvars : stmt -> var -> Prop :=
 .
 
 Definition nonfreevars (P: assertion) (x: var) : Prop :=
-  forall rho w v, P rho w -> P (table_set x v rho) w.
+  forall rho w v, P rho w -> P (set_locals x v rho) w.
 
 Definition subset (S1 S2: var -> Prop) :=
   forall x, S1 x -> S2 x.
 
 (* XXX XXX XXX Change this *)
 
-Function eval_expr (e : expr) (env : env) : value :=
+Function eval_expr (e : expr) (rho : env) : value :=
   match e with
   | e_read v =>
-    match table_get env v with
+    match get_locals rho v with
     | Some val => val
     | None => v_undef
     end
   | e_value ty v => v
   | e_cond ty b e1 e2 =>
-    match eval_expr b env with
-    | v_bool true => eval_expr e1 env
-    | v_bool false => eval_expr e2 env
+    match eval_expr b rho with
+    | v_bool true => eval_expr e1 rho
+    | v_bool false => eval_expr e2 rho
     | _ => v_undef
     end
   end
@@ -125,7 +149,7 @@ Definition typeof_val (v : value) (t : type) : Prop :=
 
 Function typeof_expr (e : expr) (rho : env) (t : type) : Prop :=
   match e with
-  | e_read v => match table_get rho v with
+  | e_read v => match get_locals rho v with
                 | None => False
                 | Some _ => type_of_var v = t
                 end
@@ -138,8 +162,9 @@ Function typeof_expr (e : expr) (rho : env) (t : type) : Prop :=
 *)
   end.
 
+(* XXX this is a preserved invariant --- move to a soundness file *)
 Lemma tt_sound :
-  forall {v} {a : value} {rho : env}, table_get rho v = Some a ->
+  forall {v} {a : value} {rho : env}, get_locals rho v = Some a ->
   typeof_val a (type_of_var v).
 Proof.
 Admitted.
@@ -166,14 +191,14 @@ Local Open Scope logic.
 
 Definition assign_forward (v : var) (e : expr) (P : assertion) (rho : env) := 
   EX old:value,
-    (!!(table_get rho v = Some (eval_expr e (table_set v old rho)))
-    && P (table_set v old rho)).
+    (!!(get_locals rho v = Some (eval_expr e (set_locals v old rho)))
+    && P (set_locals v old rho)).
 
 Definition assign_forward_load (v : var) (a:value) (ptr:addr) (e : expr) (P : assertion) (rho : env) := 
-  !!(table_get rho v = Some a) && EX old:value, (
-     !!(eval_expr e (table_set v old rho) = v_addr ptr)
+  !!(get_locals rho v = Some a) && EX old:value, (
+     !!(eval_expr e (set_locals v old rho) = v_addr ptr)
      && mapsto ptr a
-     && P (table_set v old rho)).
+     && P (set_locals v old rho)).
 
 
 (* XXX make this an option (pred world * pred world)? Some kind of type checking
@@ -251,10 +276,10 @@ Inductive hoare_stmt :
                        PC'
                        P'
                            (s_call rv (mkproc rt pv decls s) e)
-                       (fun rho => !!(table_get rho rv = Some val) &&
+                       (fun rho => !!(get_locals rho rv = Some val) &&
                                    QC' rho *
                                    QC (eval_expr e rho) val)
-                       (fun rho => !!(table_get rho rv = Some val) &&
+                       (fun rho => !!(get_locals rho rv = Some val) &&
                                    Q' rho *
                                    Q (eval_expr e rho) val)
 
@@ -274,12 +299,12 @@ Inductive hoare_stmt :
                hoare_stmt retC ret lk_invs
                           (fun rho => emp)
                           (fun rho => EX t:type, (!!(type_of_var v = t_addr (t_lock t))
-                                      && !!(table_get rho v = Some (v_addr a))
+                                      && !!(get_locals rho v = Some (v_addr a))
                                       && mapsto a lk))
                             (s_getlock v)
                           (fun rho => crash_inv lk lk_invs)
                           (fun rho => EX t:type, (!!(type_of_var v = t_addr (t_lock t))
-                                      && !!(table_get rho v = Some (v_addr a))
+                                      && !!(get_locals rho v = Some (v_addr a))
                                       && mapsto a lk * reg_inv lk lk_invs))
 
 | ht_putlock : forall retC ret lk_invs,
@@ -287,12 +312,12 @@ Inductive hoare_stmt :
                hoare_stmt retC ret lk_invs
                           (fun rho => crash_inv lk lk_invs)
                           (fun rho => EX t:type, (!!(type_of_var v = t_addr (t_lock t))
-                                      && !!(table_get rho v = Some (v_addr a))
+                                      && !!(get_locals rho v = Some (v_addr a))
                                       && mapsto a lk * reg_inv lk lk_invs))
                             (s_putlock v)
                           (fun rho => emp)
                           (fun rho => EX t:type, (!!(type_of_var v = t_addr (t_lock t))
-                                      && !!(table_get rho v = Some (v_addr a))
+                                      && !!(get_locals rho v = Some (v_addr a))
                                       && mapsto a lk))
 
 | ht_load : forall {retC ret lk_invs},
@@ -314,13 +339,13 @@ Inductive hoare_stmt :
                            C
                            (fun rho => P rho && !!(type_of_var v = t_addr t)
                                        && !!(typeof_expr e rho t)
-                                       && !!(table_get rho v = Some (v_addr ptr))
+                                       && !!(get_locals rho v = Some (v_addr ptr))
                                        && !!(eval_expr e rho = val)
                                        * ex_mapsto ptr)
                               (s_store v e)
                            C
                            (fun rho => P rho && !!(type_of_var v = t_addr t)
-                                       && !!(table_get rho v = Some (v_addr ptr))
+                                       && !!(get_locals rho v = Some (v_addr ptr))
                                        * mapsto ptr val)
 (* XXX First, we can pass off crash conditions in the same way we frame them.
        Second, locks need to be able to be split. *)
@@ -385,7 +410,7 @@ with hoare_proc :
                                      lk_invs
                                      (fun rho => PC a)
                                      (fun rho => !!(typeof_val a (type_of_var v)) && 
-                                                 !!(table_get rho v = Some a) && P a)
+                                                 !!(get_locals rho v = Some a) && P a)
                                      s
                                      ETT
                                      EFF) ->

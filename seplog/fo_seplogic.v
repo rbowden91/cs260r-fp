@@ -10,6 +10,7 @@ Require Import msl.Coqlib2.
 Require Import msl.log_normalize.
 
 Require Import ast.
+Require Import semantics.
 Require Import List.
 Import ListNotations.
 
@@ -19,30 +20,6 @@ Require FMapFacts.
 Module NatMap := FMapList.Make Nat_as_OT.
 Module NatMapFacts := FMapFacts.WFacts_fun Nat_as_OT NatMap.
 
-
-Definition env := NatMap.t value.
-Definition state := NatMap.t value.
-
-(* convenient functions for working with env *)
-Definition get_locals (rho : env) (v : var) : option value :=
-  match v with
-  | mkvar t n => NatMap.find n rho
-  end.
-Definition set_locals (v : var) (val : value) (rho : env) : env :=
-  match v with
-  | mkvar t n => NatMap.add n val rho
-  end.
-
-(*
-Definition get_heap (rho : env) (a : addr) : option value :=
-  match a with
-  | mkaddr t n b => NatMap.find n rho
-  end.
-Definition set_heap (a : addr) (val : value) (rho : env) : env :=
-  match a with
-  | mkaddr t n b => NatMap.add n val rho
-  end.
-*)
 
 Definition world := (addr -> option value)%type.
 
@@ -67,7 +44,7 @@ Admitted.
 Instance Cw: ClassicalSep (pred world) := _.
 Instance Nw: NatDed (pred world) := _.
 
-Definition assertion := env -> pred world.
+Definition assertion := Locals -> pred world.
 
 (* Definition den (s: state) : world := get_heap s. *)
 
@@ -118,7 +95,7 @@ Definition subset (S1 S2: var -> Prop) :=
 
 (* XXX XXX XXX Change this *)
 
-Function eval_expr (e : expr) (rho : env) : value :=
+Function eval_expr (e : expr) (rho : Locals) : value :=
   match e with
   | e_read v =>
     match get_locals rho v with
@@ -147,7 +124,7 @@ Definition typeof_val (v : value) (t : type) : Prop :=
   | v_undef => False
   end.
 
-Function typeof_expr (e : expr) (rho : env) (t : type) : Prop :=
+Function typeof_expr (e : expr) (rho : Locals) (t : type) : Prop :=
   match e with
   | e_read v => match get_locals rho v with
                 | None => False
@@ -164,37 +141,37 @@ Function typeof_expr (e : expr) (rho : env) (t : type) : Prop :=
 
 (* XXX this is a preserved invariant --- move to a soundness file *)
 Lemma tt_sound :
-  forall {v} {a : value} {rho : env}, get_locals rho v = Some a ->
+  forall {v} {a : value} {rho : Locals}, get_locals rho v = Some a ->
   typeof_val a (type_of_var v).
 Proof.
 Admitted.
 
-Notation ETT := (fun (_ : env) => TT).
+Notation ETT := (fun (_ : Locals) => TT).
 Notation ATT := (fun (_ : value) => TT).
 Notation ARTT := (fun (_ : value) => fun (_ : value) => TT).
-Notation EFF := (fun (_ : env) => FF).
+Notation EFF := (fun (_ : Locals) => FF).
 Notation AFF := (fun (_ : value) => FF).
 Notation ARFF := (fun (_ : value) => fun (_ : value) => FF).
 
-Notation e_emp := (fun (_ : env) => FF).
+Notation e_emp := (fun (_ : Locals) => FF).
 Notation a_emp := (fun (_ : value) => FF).
 Notation ar_emp := (fun (_ : value) => fun (_ : value) => FF).
 
 (*
-Definition lift0 {B} (P: B) : env -> B := fun _ => P.
-Definition lift1 {A1 B} (P: A1 -> B) (f1: env -> A1) : env -> B := fun rho => P (f1 rho).
-Definition lift2 {A1 A2 B} (P: A1 -> A2 -> B) (f1: env -> A1) (f2: env -> A2):
-   env -> B := fun rho => P (f1 rho) (f2 rho).
+Definition lift0 {B} (P: B) : Locals -> B := fun _ => P.
+Definition lift1 {A1 B} (P: A1 -> B) (f1: Locals -> A1) : Locals -> B := fun rho => P (f1 rho).
+Definition lift2 {A1 A2 B} (P: A1 -> A2 -> B) (f1: Locals -> A1) (f2: Locals -> A2):
+   Locals -> B := fun rho => P (f1 rho) (f2 rho).
 *)
 (*Definition local: (world -> Prop) -> world -> pred world :=  lift1 prop.*)
 Local Open Scope logic.
 
-Definition assign_forward (v : var) (e : expr) (P : assertion) (rho : env) := 
+Definition assign_forward (v : var) (e : expr) (P : assertion) (rho : Locals) := 
   EX old:value,
     (!!(get_locals rho v = Some (eval_expr e (set_locals v old rho)))
     && P (set_locals v old rho)).
 
-Definition assign_forward_load (v : var) (a:value) (ptr:addr) (e : expr) (P : assertion) (rho : env) := 
+Definition assign_forward_load (v : var) (a:value) (ptr:addr) (e : expr) (P : assertion) (rho : Locals) := 
   !!(get_locals rho v = Some a) && EX old:value, (
      !!(eval_expr e (set_locals v old rho) = v_addr ptr)
      && mapsto ptr a

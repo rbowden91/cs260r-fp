@@ -52,6 +52,24 @@ Definition Lockenv := NatMap.t LockState.
 Definition Heap := NatMap.t value.
 Definition Locals := NatMap.t value.
 
+Definition get_locals (rho : Locals) (v : var) : option value :=
+  match v with
+  | mkvar t n => NatMap.find n rho
+  end.
+Definition set_locals (v : var) (val : value) (rho : Locals) : Locals :=
+  match v with
+  | mkvar t n => NatMap.add n val rho
+  end.
+
+Definition get_heap (rho : Heap) (a : addr) : option value :=
+  match a with
+  | mkaddr t n b => NatMap.find n rho
+  end.
+Definition set_heap (a : addr) (val : value) (rho : Heap) : Heap :=
+  match a with
+  | mkaddr t n b => NatMap.add n val rho
+  end.
+
 End Stores.
 
 (**************************************************************)

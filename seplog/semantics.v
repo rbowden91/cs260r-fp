@@ -215,6 +215,11 @@ Inductive StackStepsStart: Stack -> Stack -> Stack -> Prop :=
         (stack_frame newloc stack_empty (s_call (mkvar t_unit 0) proc (e_value pt argval)))
 .
 
+Inductive StackDone: Stack -> Prop :=
+| stack_done: forall loc,
+     StackDone (stack_frame loc stack_empty s_skip)
+.
+
 End Stacks.
 
 (**************************************************************)
@@ -239,8 +244,9 @@ Inductive ThreadStepsStart: Thread -> Thread -> Thread -> Prop :=
 .
 
 Inductive ThreadDone: Thread -> Prop :=
-| thread_done: forall loc,
-     ThreadDone (thread (stack_frame loc stack_empty s_skip))
+| thread_done: forall stk,
+     StackDone stk ->
+     ThreadDone (thread stk)
 .
 
 End Threads.

@@ -241,15 +241,16 @@ Inductive hoare_stmt :
 
 (* XXX special frame for PC and QC. Also, this seems to weakly constrain the old rv... *)
 (* XXX XXX XXX Just force rv to be a new var for now... *)
+(* XXX I blithely inserted decls in the mkproc without thinking, please fix *)
 | ht_call : forall {retC ret lk_invs},
-            forall {PC PC' P P' QC QC' Q Q' rv rt pv s e val},
-            hoare_proc lk_invs PC P (mkproc rt pv s) QC Q ->
+            forall {PC PC' P P' QC QC' Q Q' rv rt pv decls s e val},
+            hoare_proc lk_invs PC P (mkproc rt pv decls s) QC Q ->
             (forall rho, PC' rho |-- PC (eval_expr e rho)) ->
             (forall rho, P' rho |-- P (eval_expr e rho)) ->
             hoare_stmt retC ret lk_invs
                        PC'
                        P'
-                           (s_call rv (mkproc rt pv s) e)
+                           (s_call rv (mkproc rt pv decls s) e)
                        (fun rho => !!(table_get rho rv = Some val) &&
                                    QC' rho *
                                    QC (eval_expr e rho) val)
@@ -323,14 +324,15 @@ Inductive hoare_stmt :
                                        * mapsto ptr val)
 (* XXX First, we can pass off crash conditions in the same way we frame them.
        Second, locks need to be able to be split. *)
+(* XXX I blithely inserted decls in the mkproc without thinking, please fix *)
 | ht_start: forall {retC ret lk_invs},
-            forall {F P P' rt pv s e},
-            hoare_proc lk_invs a_emp P (mkproc rt pv s) ar_emp ar_emp ->
+            forall {F P P' rt pv decls s e},
+            hoare_proc lk_invs a_emp P (mkproc rt pv decls s) ar_emp ar_emp ->
             (forall rho, P' rho |-- P (eval_expr e rho)) ->
             hoare_stmt retC ret lk_invs
                        e_emp
                        (fun rho => F rho * P' rho)
-                           (s_start (mkproc rt pv s) e)
+                           (s_start (mkproc rt pv decls s) e)
                        e_emp
                        F
 
@@ -372,11 +374,12 @@ Inductive hoare_stmt :
 
 (* These *don't* take assertions, because (for now) they don't need to take
  * the environment (argument / return value are explicitly passed in) *)
+(* XXX I inserted decls in the mkproc without thinking, please fix *)
 with hoare_proc :
   lk_inv_map ->
   (value -> pred world) -> (value -> pred world) -> proc -> 
   (value -> value -> pred world) -> (value -> value -> pred world) -> Prop :=
-| ht_proc : forall PC QC P Q t v s lk_invs,
+| ht_proc : forall PC QC P Q t v decls s lk_invs,
                (forall a, hoare_stmt (QC a) 
                                      (fun r => !!(typeof_val r t) && Q a r)
                                      lk_invs
@@ -386,7 +389,7 @@ with hoare_proc :
                                      s
                                      ETT
                                      EFF) ->
-               hoare_proc lk_invs PC P (mkproc t v s) QC Q.
+               hoare_proc lk_invs PC P (mkproc t v decls s) QC Q.
 
 Notation "{{ retC }} {{ ret }} {{ lk_invs }} ||- {{ PC }} {{ P }} s {{ QC }} {{ Q }}" :=
   (hoare_stmt retC ret lk_invs PC P s QC Q) (at level 90, s at next level).
@@ -448,7 +451,7 @@ Lemma ht_call_nf : forall {retC ret},
 *)
 
 Definition example1 :=
-  mkproc t_nat (mkvar t_nat 4) ([{
+  mkproc t_nat (mkvar t_nat 4) [] ([{
     s_return (e_read (mkvar t_nat 4)) ;
     s_skip ;
   }]).
@@ -475,7 +478,6 @@ Proof.
   - admit. (* s_assign *)
   - admit. (* s_load *)
   - admit. (* s_store *)
-  - admit. (* s_scope *)
   - apply ht_if.
     apply ht_p_consequence with (P:=(fun _ => FF)).
     intro. normalize.
@@ -485,7 +487,6 @@ Proof.
     trivial.
   - admit. (* s_while *)
   - admit. (* s_call... shoot, how to handle induction on p? *)
-  - admit. (* s_local *)
   - admit. (* s_return *)
   - admit. (* s_getlock *)
   - admit. (* s_putlock *)
@@ -511,7 +512,7 @@ Proof.
 Qed.
 
 Definition example2 :=
-  mkproc t_nat (mkvar t_nat 4) ([{
+  mkproc t_nat (mkvar t_nat 4) [] ([{
     s_call (mkvar t_nat 5) example1 (e_read (mkvar t_nat 4)) ;
     s_return (e_read (mkvar t_nat 5)) ;
   }]).

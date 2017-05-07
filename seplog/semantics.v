@@ -101,28 +101,19 @@ Inductive StmtSteps: Heap -> Locals -> stmt -> Heap -> Locals -> stmt -> Prop :=
      ExprYields type loc e a ->
      ExprYields type loc (e_read (mkvar type lid)) (v_addr (mkaddr type hid heapnum)) ->
      StmtSteps h loc (s_store (mkvar type lid) e) (NatMap.add hid (mkval type a) h) loc s_skip
-| step_scope: forall h loc s h' loc' s',
-     StmtSteps h loc s h' loc' s' ->
-     StmtSteps h loc (s_scope s) h' loc' (s_scope s')
-| step_endscope: forall h loc,
-     StmtSteps h loc (s_scope s_skip) h loc s_skip
 | step_if_true: forall h loc e st sf,
      ExprYields t_bool loc e v_true ->
-     StmtSteps h loc (s_if e st sf) h loc (s_scope st)
+     StmtSteps h loc (s_if e st sf) h loc st
 | step_if_false: forall h loc e st sf,
      ExprYields t_bool loc e v_false ->
-     StmtSteps h loc (s_if e st sf) h loc (s_scope sf)
+     StmtSteps h loc (s_if e st sf) h loc sf
 | step_while_true: forall h loc e body,
      ExprYields t_bool loc e v_true ->
      StmtSteps h loc (s_while e body)
-               h loc (s_seq (s_scope body) (s_while e body))
+               h loc (s_seq body (s_while e body))
 | step_while_false: forall h loc e body,
      ExprYields t_bool loc e v_false ->
      StmtSteps h loc (s_while e body) h loc s_skip
-| step_local: forall h loc id type e a,
-     NatMap.find id loc = None ->
-     ExprYields type loc e a ->
-     StmtSteps h loc (s_local (mkvar type id) e) h (NatMap.add id (mkval type a) loc) s_skip
 (* XXX
 | step_getlock: ?
 | step_putlock: ?
@@ -130,6 +121,22 @@ Inductive StmtSteps: Heap -> Locals -> stmt -> Heap -> Locals -> stmt -> Prop :=
 .
 
 End Statements.
+
+(**************************************************************)
+(* vardecls *)
+
+Section Vardecls.
+
+Inductive VardeclsSteps: Locals -> list vardecl -> Locals -> Prop :=
+| vardecls_steps_nil: forall loc,
+     VardeclsSteps loc [] loc
+| vardecls_steps_cons: forall loc t id e a decls loc',
+     ExprYields t loc e a ->
+     VardeclsSteps (NatMap.add id (mkval t a) loc) decls loc' ->
+     VardeclsSteps loc ((mkvardecl (mkvar t id) e) :: decls) loc'
+.
+
+End Vardecls.
 
 (**************************************************************)
 (* stacks *)
@@ -143,13 +150,16 @@ Inductive Stack: Type :=
 
 Inductive CallSteps: Stack -> Locals -> stmt ->
                      Stack -> Locals -> stmt -> Prop :=
-| call_steps: forall loc stk retid rt paramid pt body arg argval,
+| call_steps: forall loc arg argval stk retid rt paramid pt decls newloc body,
      ExprYields pt loc arg argval ->
+     VardeclsSteps (NatMap.add paramid (mkval pt argval) (NatMap.empty val))
+                   decls
+                   newloc ->
      CallSteps stk loc (s_call (mkvar rt retid)
-                               (mkproc rt (mkvar pt paramid) body)
+                               (mkproc rt (mkvar pt paramid) decls body)
                                arg)
                (stack_pending rt loc (mkvar rt retid) stk)
-               (NatMap.add paramid (mkval pt argval) (NatMap.empty val))
+               newloc
                body
 .
 
@@ -196,13 +206,15 @@ Inductive ThreadSteps: Heap -> Thread -> Heap -> Thread -> Prop :=
 .
 
 (* this is its own thing because it needs a different signature *)
+(* XXX make sure the constraint that started procs return unit gets into the types *)
 Inductive ThreadStepsStart: Thread -> Thread -> Thread -> Prop :=
-| thread_steps_start: forall loc stk pt paramid body arg argval,
+| thread_steps_start: forall pt loc stk proc arg newloc argval,
      ExprYields pt loc arg argval ->
+     newloc = NatMap.add 0 (mkval t_unit v_unit) (NatMap.empty val) ->
      ThreadStepsStart
-	(thread loc stk (s_start (mkproc t_unit (mkvar pt paramid) body) arg))
+	      (thread loc stk (s_start proc arg))
         (thread loc stk s_skip)
-	(thread (NatMap.add paramid (mkval pt argval) (NatMap.empty val)) stack_empty body)
+        (thread newloc stack_empty (s_call (mkvar t_unit 0) proc (e_value pt argval)))
 .
 
 End Threads.
@@ -228,3 +240,4 @@ Inductive MachineSteps: Machine -> Machine -> Prop :=
 .
 
 End Machines.
+

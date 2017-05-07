@@ -52,63 +52,75 @@ Inductive VarsScopedExpr: forall (t: type), VarMap type -> expr -> Prop :=
      VarsScopedExpr t env (e_cond t pred te fe)
 .
 
-Inductive VarsScopedStmt: VarMap type -> stmt -> VarMap type -> Prop :=
+Inductive VarsScopedStmt: VarMap type -> stmt -> Prop :=
 | vars_scoped_skip: forall env,
-     VarsScopedStmt env s_skip env
-| vars_scoped_seq: forall env s1 env' s2 env'',
-     VarsScopedStmt env s1 env' ->
-     VarsScopedStmt env' s2 env'' ->
-     VarsScopedStmt env (s_seq s1 s2) env''
+     VarsScopedStmt env s_skip
+| vars_scoped_seq: forall env s1 s2,
+     VarsScopedStmt env s1 ->
+     VarsScopedStmt env s2 ->
+     VarsScopedStmt env (s_seq s1 s2)
 | vars_scoped_start: forall env pt p e,
      VarsScopedProc pt t_unit p ->
      VarsScopedExpr pt env e ->
-     VarsScopedStmt env (s_start p e) env
+     VarsScopedStmt env (s_start p e)
 | vars_scoped_assign: forall t env id e,
      VarsScopedExpr t env e ->
      VarMapMapsTo (mkvar t id) t env ->
-     VarsScopedStmt env (s_assign (mkvar t id) e) env
+     VarsScopedStmt env (s_assign (mkvar t id) e)
 | vars_scoped_load: forall t env id e,
      VarsScopedExpr (t_addr t) env e ->
      VarMapMapsTo (mkvar t id) t env ->
-     VarsScopedStmt env (s_load (mkvar t id) e) env
+     VarsScopedStmt env (s_load (mkvar t id) e)
 | vars_scoped_store: forall t env lid e,
      VarMapMapsTo (mkvar (t_addr t) lid) (t_addr t) env ->
      VarsScopedExpr t env e ->
-     VarsScopedStmt env (s_store (mkvar (t_addr t) lid) e) env
-| vars_scoped_scope: forall env s env',
-     VarsScopedStmt env s env' ->
-     VarsScopedStmt env (s_scope s) env
-| vars_scoped_if: forall env pred ts fs env't env'f,
+     VarsScopedStmt env (s_store (mkvar (t_addr t) lid) e)
+| vars_scoped_if: forall env pred ts fs,
      VarsScopedExpr t_bool env pred ->
-     VarsScopedStmt env ts env't ->
-     VarsScopedStmt env fs env'f ->
-     VarsScopedStmt env (s_if pred ts fs) env
-| vars_scoped_while: forall env pred body env'body,
+     VarsScopedStmt env ts ->
+     VarsScopedStmt env fs ->
+     VarsScopedStmt env (s_if pred ts fs)
+| vars_scoped_while: forall env pred body,
      VarsScopedExpr t_bool env pred ->
-     VarsScopedStmt env body env'body ->
-     VarsScopedStmt env (s_while pred body) env
+     VarsScopedStmt env body ->
+     VarsScopedStmt env (s_while pred body)
 | vars_scoped_call: forall env pt rt id p arg,
      VarsScopedProc pt rt p ->
      VarsScopedExpr pt env arg ->
      VarMapMapsTo (mkvar rt id) rt env ->
-     VarsScopedStmt env (s_call (mkvar rt id) p arg) env
-| vars_scoped_local: forall t env id e,
-     VarsScopedExpr t env e ->
-     ~(VarMapIn (mkvar t id) env) ->
-     VarsScopedStmt env (s_local (mkvar t id) e) (VarMap_add (mkvar t id) t env)
+     VarsScopedStmt env (s_call (mkvar rt id) p arg)
 | vars_scoped_return: forall t env e,
      (* XXX this doesn't check against the proc type... *)
      VarsScopedExpr t env e ->
-     VarsScopedStmt env (s_return e) env
+     VarsScopedStmt env (s_return e)
 | vars_scoped_getlock: forall t env id,
-     VarsScopedStmt env (s_getlock (mkvar (t_lock t) id)) env
+     VarsScopedStmt env (s_getlock (mkvar (t_lock t) id))
 | vars_scoped_putlock: forall t env id,
-     VarsScopedStmt env (s_getlock (mkvar (t_lock t) id)) env
+     VarsScopedStmt env (s_getlock (mkvar (t_lock t) id))
 with
+
+(*Inductive*) VarsScopedVardecl: VarMap type -> vardecl -> VarMap type -> Prop :=
+| vars_scoped_vardecl: forall t env id e,
+     VarsScopedExpr t env e ->
+     ~(VarMapIn (mkvar t id) env) ->
+     VarsScopedVardecl env (mkvardecl (mkvar t id) e) (VarMap_add (mkvar t id) t env)
+with
+
+(*Inductive*) VarsScopedVardecls: VarMap type -> list vardecl -> VarMap type -> Prop :=
+| vars_scoped_vardecls_nil: forall env,
+     VarsScopedVardecls env [] env
+| vars_scoped_vardecls_cons: forall env decl env' decls env'',
+     VarsScopedVardecl env decl env' ->
+     VarsScopedVardecls env' decls env'' ->
+     VarsScopedVardecls env (decl :: decls) env''
+with
+
 (*Inductive*) VarsScopedProc: forall pt rt, proc -> Prop :=
-| vars_scoped_proc: forall pt rt id body env',
-     VarsScopedStmt (VarMap_add (mkvar pt id) pt (VarMap_empty type)) body env' ->
-     VarsScopedProc pt rt (mkproc rt (mkvar pt id) body)
+| vars_scoped_proc: forall pt rt id decls body env,
+     VarsScopedVardecls (VarMap_add (mkvar pt id) pt (VarMap_empty type))
+			decls env ->
+     VarsScopedStmt env body ->
+     VarsScopedProc pt rt (mkproc rt (mkvar pt id) decls body)
 .
 
 (* XXX clear these out later *)
@@ -151,8 +163,6 @@ Inductive VarsUniqueStmt: stmt -> VarMap unit -> Prop :=
 | vars_unique_call: forall x p arg,
      VarsUniqueProc p ->
      VarsUniqueStmt (s_call x p arg) (VarMap_empty unit)
-| vars_unique_local: forall x e,
-     VarsUniqueStmt (s_local x e) (VarMap_add x tt(*unit*) (VarMap_empty unit))
 | vars_unique_return: forall e,
      VarsUniqueStmt (s_return e) (VarMap_empty unit)
 | vars_unique_getlock: forall t id,
@@ -160,11 +170,26 @@ Inductive VarsUniqueStmt: stmt -> VarMap unit -> Prop :=
 | vars_unique_putlock: forall t id,
      VarsUniqueStmt (s_getlock (mkvar (t_lock t) id)) (VarMap_empty unit)
 with
+
+(*Inductive*) VarsUniqueVardecls: list vardecl -> VarMap unit -> Prop :=
+| vars_unique_vardecls_nil:
+     VarsUniqueVardecls [] (VarMap_empty unit)
+| vars_unique_vardecls_cons: forall x e env0 decls env,
+     env0 = VarMap_add x tt(*unit*) (VarMap_empty unit) ->
+     VarsUniqueVardecls decls env ->
+     VarMapDisjoint unit env0 env ->
+     VarsUniqueVardecls ((mkvardecl x e) :: decls) (VarMap_union env0 env)
+with
+
 (*Inductive*) VarsUniqueProc: proc -> Prop :=
-| vars_unique_proc: forall rt x body env',
-     VarMapDisjoint unit (VarMap_add x tt(*unit*) (VarMap_empty unit)) env' ->
-     VarsUniqueStmt body env' ->
-     VarsUniqueProc (mkproc rt x body)
+| vars_unique_proc: forall rt x decls body env_a env_d env_b,
+     env_a = (VarMap_add x tt(*unit*) (VarMap_empty unit)) ->
+     VarsUniqueVardecls decls env_d ->
+     VarMapDisjoint unit env_a env_d ->
+     VarsUniqueStmt body env_b ->
+     VarMapDisjoint unit env_a env_b ->
+     VarMapDisjoint unit env_d env_b ->
+     VarsUniqueProc (mkproc rt x decls body)
 .
 
 
@@ -180,9 +205,9 @@ Inductive StmtEndsInReturn: stmt -> type -> Prop :=
      StmtEndsInReturn (s_return e) t
 with
 (*Inductive*) ProcReturnOk: forall rt, proc -> Prop :=
-| proc_return_ok: forall rt v s,
-     StmtEndsInReturn s rt ->
-     ProcReturnOk rt (mkproc rt v s)
+| proc_return_ok: forall rt param decls body,
+     StmtEndsInReturn body rt ->
+     ProcReturnOk rt (mkproc rt param decls body)
 .
 
 
@@ -224,16 +249,23 @@ Inductive InStmt : forall t, var -> stmt -> Prop :=
     InStmt rt (mkvar rt id) (s_call (mkvar rt id) p e)
 | instmt_call_expr : forall t v v' p e,
     InExpr t v e -> InStmt t v (s_call v' p e)
+(*
 | instmt_local_var : forall t id e,
     InStmt t (mkvar t id) (s_local (mkvar t id) e)
 | instmt_local_expr : forall t v v' e,
     InExpr t v e -> InStmt t v (s_local v' e)
+*)
 | instmt_return : forall t v e,
     InExpr t v e -> InStmt t v (s_return e)
 (* XXX need to handle getlock and putlock *)
 .
 (* inspect to see that the constructor types were inferred properly *)
 (* Print InStmt. *)
+
+(*
+ * XXX this doesn't work any more because it needs to collect vars from the
+ * proc header.
+ *)
 
 (* XXX assuming the env for the proc and statement are separate,
    so variable use in a proc doesn't contaminate the calling statement whatsoever *)
@@ -270,9 +302,6 @@ Inductive StmtVarRespectsT (t : type) (s : varidtype) : stmt -> Prop :=
     StmtVarRespectsT t s (s_load (mkvar t s) l)
 | svrt_load_neq : forall t' s' l,
     s <> s' -> StmtVarRespectsT t s (s_load (mkvar t' s') l)
-| svrt_scope : forall s1,
-    StmtVarRespectsT t s s1 ->
-    StmtVarRespectsT t s (s_scope s1)
 | svrt_if : forall b s1 s2,
     ExprVarRespectsT t s t_bool b -> StmtVarRespectsT t s s1 -> StmtVarRespectsT t s s2 ->
     StmtVarRespectsT t s (s_if b s1 s2)
@@ -283,10 +312,6 @@ Inductive StmtVarRespectsT (t : type) (s : varidtype) : stmt -> Prop :=
 | svrt_call_neq : forall t' s' pt p exp,
     (* XXX does this bind pt properly? *)
     s <> s' -> ExprVarRespectsT t s pt exp -> StmtVarRespectsT t s (s_call (mkvar t' s') p exp)
-| svrt_local_eq : forall e,
-    ExprVarRespectsT t s t e -> StmtVarRespectsT t s (s_local (mkvar t s) e)
-| svrt_local_neq : forall t' s' e,
-    s <> s' -> ExprVarRespectsT t s t' e -> StmtVarRespectsT t s (s_local (mkvar t' s') e)
 | svrt_return : forall t' e,
     ExprVarRespectsT t s t' e -> StmtVarRespectsT t s (s_return e)
 (* XXX *)
@@ -298,18 +323,33 @@ Inductive StmtVarRespectsT (t : type) (s : varidtype) : stmt -> Prop :=
 (* inspect to see that the constructor types were inferred properly *)
 (* Print StmtVarRespectsT. *)
 
+Inductive DeclsVarRespectsT t id: list vardecl -> Prop :=
+| dvrt_nil:
+     DeclsVarRespectsT t id []
+| dvrt_cons_eq: forall e decls,
+     ExprVarRespectsT t id t e ->
+     DeclsVarRespectsT t id decls ->
+     DeclsVarRespectsT t id ((mkvardecl (mkvar t id) e) :: decls)
+| dvrt_cons_neq : forall t' id' e decls,
+     id <> id' ->
+     ExprVarRespectsT t id t' e ->
+     DeclsVarRespectsT t id decls ->
+     DeclsVarRespectsT t id ((mkvardecl (mkvar t' id') e) :: decls)
+.
+
 (* does a proc respect variable usage? *)
 Inductive ProcVarRespectsT pt rt: proc -> Prop :=
-| pvrt : forall s st,
-    StmtVarRespectsT pt s st ->
-    (forall t s, InStmt t (mkvar t s) st -> StmtVarRespectsT t s st) ->
-    ProcVarRespectsT pt rt (mkproc rt (mkvar pt s) st)
+| pvrt : forall id decls body,
+    StmtVarRespectsT pt id body ->
+    DeclsVarRespectsT pt id decls ->
+    (forall t id, InStmt t (mkvar t id) body -> StmtVarRespectsT t id body) ->
+    ProcVarRespectsT pt rt (mkproc rt (mkvar pt id) decls body)
 .
 
 
 Definition StmtOk s : Prop :=
-   (forall env env', VarsScopedStmt env s env') /\
-   (forall env', VarsUniqueStmt s env')
+   (forall env, VarsScopedStmt env s) /\
+   (forall env, VarsUniqueStmt s env)
 .
 
 Definition ProcOk pt rt (p: proc): Prop :=

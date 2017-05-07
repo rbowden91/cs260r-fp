@@ -123,7 +123,7 @@ with
 (*Inductive*) VarsScopedProc: forall pt rt, proc -> Prop :=
 | vars_scoped_proc: forall pt rt id decls body env,
      VarsScopedVardecls (VarMap_add (mkvar pt id) pt (VarMap_empty type))
-			decls env ->
+                        decls env ->
      VarsScopedStmt env body ->
      VarsScopedProc pt rt (mkproc rt (mkvar pt id) decls body)
 .

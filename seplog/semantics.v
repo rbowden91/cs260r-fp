@@ -17,7 +17,7 @@ Require Import ast.
 (*                                                              *)
 (*                          semantics                           *)
 (*                                                              *)
-(* ************************************************************ *)	
+(* ************************************************************ *)
 (* ************************************************************ *)
 
 (*
@@ -31,7 +31,7 @@ Require Import ast.
  * Statements are executed destructively.
  *)
 
-(**************************************************************)	
+(**************************************************************)
 (* stores *)
 
 Section Stores.
@@ -48,7 +48,7 @@ Definition Locals := NatMap.t value.
 
 End Stores.
 
-(**************************************************************)	
+(**************************************************************)
 (* expressions *)
 
 Section Expressions.
@@ -73,7 +73,7 @@ Inductive ExprYields: forall t, Locals -> expr -> value -> Prop :=
 
 End Expressions.
 
-(**************************************************************)	
+(**************************************************************)
 (* statements *)
 
 Section Statements.
@@ -258,16 +258,15 @@ Inductive MachineSteps: Machine -> Machine -> Prop :=
 | machine_steps_plain: forall h t h' t' ts1 ts2,
      ThreadSteps h t h' t' ->
      MachineSteps (machine h (ts1 ++ [t] ++ ts2))
-		  (machine h' (ts1 ++ [t'] ++ ts2))
+                  (machine h' (ts1 ++ [t'] ++ ts2))
 | machine_steps_start: forall h t t1 t2 ts1 ts2,
      ThreadStepsStart t t1 t2 ->
      MachineSteps (machine h (ts1 ++ [t] ++ ts2))
-		  (machine h (ts1 ++ [t1; t2] ++ ts2))
+                  (machine h (ts1 ++ [t1; t2] ++ ts2))
 | machine_steps_exit: forall h t ts1 ts2,
      ThreadDone t ->
      MachineSteps (machine h (ts1 ++ [t] ++ ts2))
-		  (machine h (ts1 ++ ts2))
+                  (machine h (ts1 ++ ts2))
 .
 
 End Machines.
-

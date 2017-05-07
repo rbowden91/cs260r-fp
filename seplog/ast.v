@@ -85,7 +85,7 @@ Inductive expr: Type :=
  * statements don't
  *)
 Inductive stmt: Type :=
-| s_skip : stmt
+| s_skip: stmt
 | s_seq: stmt -> stmt -> stmt
 | s_start: proc -> expr -> stmt
 | s_assign: var -> expr -> stmt

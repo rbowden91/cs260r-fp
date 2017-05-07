@@ -21,13 +21,14 @@ or a kernel panic. After a crash, recovery can only act on the post-crash
 durable disk state; all volatile state (including data in the buffer and disk
 cache) is lost. However, we can extend the notion of a ``crash'' to more
 generally describe any possible break in the normal control flow of a program.
-It is possible to reason about volatile state correctness in the presence of
-things like signals, exceptions, and interrupts in the same way that one reasons
-about durable state correctness in the presence of power loss or kernel panics.
+It is possible to reason about both durable and volatile state correctness in
+the presence of things like signals, exceptions, and interrupts in the same way
+that one reasons about durable state correctness in the presence of power loss
+or kernel panics.
 
 Several file systems have been formally verified as crash-safe, which typically
-involves reasoning about a crash at all possible steps of execution. In
-verifying FSCQ, one such verified file system, Chen et al.\ developed crash
+involves reasoning about a potential crash at all possible steps of execution.
+In verifying FSCQ, one such verified file system, Chen et al.\ developed crash
 Hoare logic to facilitate such reasoning\cite{chen2015using}. However, to date,
 no file system is able to handle multiple concurrent file system write
 operations.
@@ -36,7 +37,7 @@ The contribution of this work is to first extend crash Hoare logic into
 \textit{concurrent} crash Hoare logic, to allow for reasoning about concurrent
 operations even in the face of crashes, and to take first steps at proving the
 logic sound. Then, with a sound logic, we intend to use the concurrent crash
-hoare logic to build a fully concurrent file system
+Hoare logic to build a fully concurrent file system.
 
 \section{Related Work}
 

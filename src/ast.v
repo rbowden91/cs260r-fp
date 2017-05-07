@@ -84,19 +84,18 @@ Inductive expr: Type :=
  *)
 Inductive stmt: Type :=
 | s_block: list stmt -> stmt
-| s_start: forall (pt : type), proc -> expr -> stmt (* XXX remove pt *)
-| s_assign: forall (t : type), var -> expr -> stmt  (* XXX remove t *)
-| s_load: forall (t : type), var -> expr -> stmt  (* XXX remove t *)
-| s_store: forall (t : type), var -> expr -> stmt  (* XXX remove t *)
+| s_start: proc -> expr -> stmt
+| s_assign: var -> expr -> stmt
+| s_load: var -> expr -> stmt
+| s_store: var -> expr -> stmt
 | s_scope: stmt -> stmt
 | s_if: expr -> stmt -> stmt -> stmt
 | s_while: expr -> stmt -> stmt
-| s_call: forall (pt rt : type), var -> proc -> expr -> stmt
-          (* XXX remove pt, rt *)
-| s_local: forall (t : type), var -> expr -> stmt (* XXX remove t *)
-| s_return: forall (t : type), expr -> stmt	 (* XXX remove t *)
-| s_getlock: forall (t : type), var -> stmt	 (* XXX remove t *)
-| s_putlock: forall (t : type), var -> stmt	 (* XXX remove t *)
+| s_call: var -> proc -> expr -> stmt
+| s_local: var -> expr -> stmt
+| s_return: expr -> stmt
+| s_getlock: var -> stmt
+| s_putlock: var -> stmt
 with
 
 (*

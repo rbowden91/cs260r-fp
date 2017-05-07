@@ -101,7 +101,7 @@ Function eval_expr (e : expr) (env : env) : value :=
     | Some val => val
     | None => v_undef
     end
-  | e_value v => v
+  | e_value ty v => v
   | e_cond ty b e1 e2 =>
     match eval_expr b env with
     | v_bool true => eval_expr e1 env
@@ -129,7 +129,7 @@ Function typeof_expr (e : expr) (rho : env) (t : type) : Prop :=
                 | None => False
                 | Some _ => type_of_var v = t
                 end
-  | e_value v => typeof_val v t
+  | e_value ty v => ty = t (* XXX? typeof_val v t *)
   | e_cond ty eb e1 e2 => ty = t
 (* XXX?
     typeof_expr eb rho t_bool /\

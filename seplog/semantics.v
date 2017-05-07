@@ -145,51 +145,62 @@ Inductive Stack: Type :=
 | stack_frame: Locals -> Stack -> stmt -> Stack
 .
 
-Inductive ReturnSteps: Stack -> Locals -> stmt ->
-                        Stack -> Locals -> stmt -> Prop :=
-| return_steps: forall loc loc' rt retid stk ejunk ret retval,
-     ExprYields rt loc ret retval ->
-     ReturnSteps (stack_frame loc' stk (s_assign (mkvar rt retid) ejunk)) loc (s_return ret)
-                 stk loc' (s_assign (mkvar rt retid) (e_value rt retval))
-.
-
 Inductive StackSteps: Heap -> Stack -> Heap -> Stack -> Prop :=
+
 | stack_steps_stmt: forall h loc stk s h' loc' s',
      StmtSteps h loc s h' loc' s' ->
      StackSteps h (stack_frame loc stk s) h' (stack_frame loc' stk s')
+
 | stack_steps_call_final: forall h loc stk x proc arg,
      (* gross but avoids duplicating the call frame logic *)
      StackSteps h (stack_frame loc stk (s_call x proc arg))
                 h (stack_frame loc stk (s_seq (s_call x proc arg) s_skip))
+
 | stack_steps_call_seq: forall
                             h loc stk s s2
                             rt retid pt paramid decls body arg argval
                             s' new'loc,
      (* restrict the form of the call statement *)
-     s = (s_call (mkvar rt retid)
-                 (mkproc rt (mkvar pt paramid) decls body)
-                 arg) ->
-     (* the new statement for the current frame *)
+     s = (s_seq (s_call (mkvar rt retid)
+                    (mkproc rt (mkvar pt paramid) decls body)
+                    arg)
+                 s2) ->
+     (* the new statement for the outer frame *)
      s' = s_seq (s_assign (mkvar rt retid) (e_value rt v_undef)) s2 ->
 
-     (* evaluate the arg in the current frame *)
+     (* evaluate the arg in the outer frame *)
      ExprYields pt loc arg argval ->
-     (* create the new frame *)
+
+     (* create the locals for the new inner frame *)
      VardeclsSteps (NatMap.add paramid argval (NatMap.empty value))
                    decls
                    new'loc ->
 
-     (* complete statement *)
-     StackSteps h (stack_frame loc stk (s_seq s s2))
-                h (stack_frame new'loc (stack_frame loc stk s') body)
-| stack_steps_return_final: forall h loc stk s loc' stk' s',
-     ReturnSteps stk loc s stk' loc' s' ->
+     (* make a new frame to evaluate the procedure body *)
      StackSteps h (stack_frame loc stk s)
-		 h (stack_frame loc' stk' s')
-| stack_steps_return_seq: forall h loc stk s s2 loc' stk' s',
-     ReturnSteps stk loc s stk' loc' s' ->
-     StackSteps h (stack_frame loc stk (s_seq s s2))
-		 h (stack_frame loc' stk' s')
+                h (stack_frame new'loc (stack_frame loc stk s') body)
+
+| stack_steps_return_seq: forall h loc stk e s2,
+     (* return followed by crap is just return *)
+     StackSteps h (stack_frame loc stk (s_seq (s_return e) s2))
+                h (stack_frame loc stk (s_return e))
+
+| stack_steps_return_final: forall h
+                                loc loc' stk' s' s''
+                                rt ret retval
+                                x ejunk,
+     (* evaluate the return expression in the inner frame *)
+     ExprYields rt loc ret retval ->
+
+     (* the statement in the outer frame must be an assignment *)
+     s' = s_assign x ejunk ->
+
+     (* and gets updated with the return value *)
+     s'' = s_assign x (e_value rt retval) ->
+
+     (* pop the frame *)
+     StackSteps h (stack_frame loc (stack_frame loc' stk' s') (s_return ret))
+                h (stack_frame loc' stk' s'')
 .
 
 (* this is its own thing because it needs a different signature *)
@@ -206,7 +217,7 @@ Inductive StackStepsStart: Stack -> Stack -> Stack -> Prop :=
 
 End Stacks.
 
-(**************************************************************)	
+(**************************************************************)
 (* threads *)
 
 Section Threads.
@@ -234,7 +245,7 @@ Inductive ThreadDone: Thread -> Prop :=
 
 End Threads.
 
-(**************************************************************)	
+(**************************************************************)
 (* machines *)
 
 Section Machines.

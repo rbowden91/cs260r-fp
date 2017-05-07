@@ -5,49 +5,108 @@
 \end{abstract}
 
 \section{Introduction}
-Proving the functional correctness of file systems is critical to ensuring data
-integrity of higher level user applications. Bugs are regularly found in
-commonly-used file systems, which can lead to data
-corruption.\cite{yang2006explode}
-While formal verification is already a
-nontrivial task for most systems
-\footnote{Insert obligatory ``seL4 took
-\textit{twenty person years}!!!'' comment.},
-file systems have the added
-difficulty of needing to maintain consistent states, even in the face of
-crashes.
-Strategies like soft updates and write-ahead logging can be used to
-protect against data loss and corruption, but bugs can and have resulted in
-violating necessary invariants of these strategies.
 
-In the case of file systems, examples of a source of a crash include power loss
-or a kernel panic.
-After a crash, recovery can only act on the post-crash
-durable disk state; all volatile state (including data in the buffer and disk
-cache) is lost.
-However, we can extend the notion of a ``crash'' to more
-generally describe any possible break in the normal control flow of a program.
-It is possible to reason about both durable and volatile state correctness in
-the presence of things like signals, exceptions, and interrupts in the same way
-that one reasons about durable state correctness in the presence of power loss
-or kernel panics.
+File systems that store data persistently are a critical component of
+operating systems.
+As such, their correctness is fundamental to the integrity and
+reliability of operating systems and thus of all higher-level
+application software running on those systems.
+Data loss and corruption bugs are regularly found in existing
+file systems, even widely used ones \cite{yang2006explode},
+and loss of persistent data is inherently more serious and has broader
+ramifications than kernel bugs that merely require rebooting.
+Therefore, proving the functional correctness of file systems is
+highly desirable.
 
-Several file systems have been formally verified as crash-safe, which typically
-involves reasoning about a potential crash at all possible steps of execution.
-In verifying FSCQ, one such verified file system, Chen et al.\ developed crash
-Hoare logic to facilitate such reasoning\cite{chen2015using}.
-However, to date,
-no formally verified file system has been able to handle multiple concurrent
-file system write operations.
+Formal verification of software systems is already a
+nontrivial task in general\footnote{
+``seL4 took
+\textit{twenty person-years}!!!''},
+but for file systems an additional difficulty arises:
+file systems have persistent state on disk, and
+that state must remain consistent even in the face of
+system crashes.
+Strategies like journaling and soft updates are used to keep crashes
+from causing corruption and data loss, but in the absence of
+verification bugs can, have, and will continue to defeat these
+techniques.
 
-The contribution of this work is to first extend crash Hoare logic into
-\textit{concurrent} crash Hoare logic, to allow for reasoning about concurrent
-operations even in the face of crashes, and to take first steps at proving the
-logic sound.
-Then, having proven it sound, we intend to use the concurrent
-crash Hoare logic to build a fully concurrent file system.
+To reason about the correctness of a file system one must reason both
+about transient in-memory state and persistent on-disk state.
+Crashes (arising for example from power failures, hardware faults,
+kernel panics in unverified components) erase the transient state.
+This includes data in the kernel's buffer cache and, with modern
+disks, potentially also unwritten data cached within the disk itself.
+This can happen at any time and after any step of execution; unlike
+when reasoning about, for example,
+interrupts (already difficult enough) it is not possible to
+block crashes in order to execute a critical section.
+
+Reasoning about state in the presence of uncontrollable external
+interrupts needs
+specific support in the program logic.
+This support is primarily useful for reasoning about persistent state
+in the presence of system crashes, but it can be used for other
+things.
+For example, one might use it to reason about (transient) program
+state in the presence of imprecise floating point exceptions.
+% and sometimes blocking signals is too expensive and you have to
+% cope with having them come in arbitrarily...
+
+After a crash, the system reboots, and runs a procedure
+known as \emph{recovery}, whose goal is to examine the on-disk state
+and correct it as necessary to resume normal functioning.
+This also requires support in the program logic, because (in general)
+the recovery procedure starts with the persistent disk state in an
+otherwise illegal intermediate condition that does not meet the
+preconditions for any ordinary operation.
+The program logic must splice the conditions enforced on the
+persistent state during operation (``crash conditions'') to the
+precondition of the recovery procedure, and the postcondition of the
+recovery procedure (``recovery conditions'') to the preconditions for
+normal operations.
+The full specification of a file system includes recovery conditions
+that describe the guarantees made to applications about the state of
+files and other file system objects after a crash occurs.
+
+Chen at al \cite{chen2015using} introduced the concept of \emph{crash
+Hoare logic} for reasoning about persistent state in the presence of
+arbitrary crashes.
+This work introduced the concept of crash conditions, but it does not
+have explicit recovery conditions: their file system (FSCQ) is
+entirely synchronous (so no data is buffered past an operation
+completing) and their program logic does not support concurrency, so
+only one operation can be in progress at a time and their recovery
+scheme either fully completes or fully aborts it.
+
+While other file systems besides FSCQ have been formally verified as
+crash-safe, none to our knowledge support concurrent execution and
+most do not support write-back caching.
+The ultimate intended goal of this project was to develop a file
+system, or at least a file system model, that supports both concurrent
+execution and write-back caching, and prove it correct in the presence
+of crashes with a relatively strict set of post-crash guarantees.
+The actual contribution of this project so far is, first, to extend
+crash Hoare logic into \emph{concurrent} crash Hoare logic, to allow
+for reasoning about concurrent operations even in the face of crashes,
+and second, to take first steps at proving the
+logic sound and provide some simple example code demonstrating that
+the logic is also useful.
+Ultimately, having proven the logic sound, we still intend to use the
+concurrent crash Hoare logic to build a fully concurrent file system.
+
+In the remainder of this paper we first discuss related work
+(Section \ref{sec:relwork}), then introduce the language and the
+small-step operational semantics we use as a basis (Section
+\ref{sec:semantics}).
+In Section \ref{sec:logic} we describe the program logic.
+Then in Section \ref{sec:eval} we discuss our examples and an
+evaluation of the usefulness of the logic.
+Finally we discuss future work (Section \ref{sec:future}) and in
+Section \ref{sec:conclusions} conclude.
 
 \section{Related Work}
+\label{sec:relwork}
 
 \subsection{Separation logic}
 Separation logic\cite{reynolds2002separation} introduced an intuitive way to
@@ -312,7 +371,11 @@ systems implemented using Yggdrasil are limited to single-threaded code.
 
 % Flashix??
 
+\section{Language and Semantics}
+\label{sec:semantics}
+
 \section{Crash Concurrent Separation Hoare Logic}
+\label{sec:logic}
 
 \subsection{Language}
 
@@ -778,11 +841,15 @@ strong invariants in our current crash condition associated with that heap
 address.
 
 \section{Example and Evaluation}
+\label{sec:eval}
 
 Our logic has been formalized in the Coq proof assistant.
 
+% usefulness
+% useability
 
 \section{Future Work}
+\label{sec:future}
 
 % XXX Lemma about strong invariants always holding??
 
@@ -855,6 +922,7 @@ The fundamental concurrent crash Hoare logic remains the same, but we
 could potentially use Coq values directly.
 
 \section{Conclusions}
+\label{sec:conclusions}
 
 \appendix
 \section{Language}

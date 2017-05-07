@@ -592,7 +592,7 @@ prove that statement $s$ satisfies:
 \end{gather*}
 
 First, the procedure's conditions are all parameterized by the input argument.
-Second, The procedure's post-conditions are pulled into the \textit{return}
+Second, the procedure's post-conditions are pulled into the \textit{return}
 conditions of the body, the post-condition is False, and the post
 crash-condition is True. False and True enforce that the body must always have a
 return statement, which, as we will see, is a rule that can satisfy those
@@ -662,12 +662,12 @@ system purposes, this is strictly necessary in order to reason about multiple
 concurrent threads sharing pointers to the same locks.
 
 Additionally, our language does not currently include any dynamic heap
-allocation, include malloc, free, lock creation, and lock deletion. These are
+allocation, including malloc, free, lock creation, and lock deletion. These are
 necessary to be able to correctly model operations such as file system mount and
 unmount. A fundamental issue is that, traditionally, dynamic locks introduce the
 aforementioned issue of ``predicates on the heap''. Once locks are dynamic and
 predicates are placed on the heap, we lose the power to reason about what global
-invariants a program must abide, and as such, can no longer reason about a
+invariants a program must abide by, and as such can no longer reason about a
 consistent state for recovery to act upon.
 
 We have toyed with the idea that a solution to this problem is to give each lock
@@ -675,25 +675,27 @@ an explicit type, and all locks of a given type must share the same resource
 invariant (parameterized by the address of the resource that the lock is
 protecting). That way, we no longer have predicates on the heap, and the
 $(L^c,L^r)$ mapping to the left of $\vDash$, parameterized by both lock type and
-address, once again contains all possible strong invariants.
+address, once again contains all possible strong invariants. Here, the strong
+invariants associated with each lock type would constitute the global invariants
+the program adheres to.
 
 As mentioned earlier, there is an alternative frame rule that combines the two
 frame rules that we currently have that we have not yet implemented. A related
 issue is that any resource pulled into the pre-condition must also be pulled
-into the crash pre-condition, though the actual constraints (weak vs strong)
+into the crash pre-condition, though the actual constraints (weak vs.\ strong)
 can differ between the two. Once dynamic memory is implemented, it seems to make
 even less sense for something like $\exists (x:vnode), 10\mapsto x$ to appear in
 a strong invariant, since $10$ can be deallocated and reallocated.
 
 Our proposed solution to this problem is to combine the crash conditions into
-the regular conditions, and directly tag an address with both the weak and
-strong invariants by which it must abide (according to the lock type that
-protects the address). The strong invariant must be respected whenever we store
-to that address, and the weak invariant must be respected whenever we attempt to
-release the lock protecting that address. Now, we have an even simpler frame
-rule that can frame anything out of the current state, since framing out an
-address automatically frames out both the strong and weak invariants associated
-with it.
+the regular conditions and maintain only a set of addresses, each of which
+would be tagged directly with both the weak and strong invariants by which it
+must abide (according to the lock type that protects the address). The strong
+invariant must be respected whenever we store to that address, and the weak
+invariant must be respected whenever we attempt to release the lock protecting
+that address. Now, we have an even simpler frame rule that can frame anything
+out of the current state, since framing out an address automatically frames out
+both the strong and weak invariants associated with it.
 
 As an aside, it might have been possible to avoid making the language completely
 imperative by just extending FSCQ's disk read and write operations with lock and

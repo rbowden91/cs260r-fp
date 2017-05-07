@@ -3,7 +3,7 @@
 % limit two pages, due Monday April 17
 
 % layout
-\documentclass[10pt, twocolumn, letterpaper]{article}
+\documentclass[11pt, twocolumn, letterpaper]{article}
 \usepackage{fullpage}
 \frenchspacing
 %\usepackage{parskip}
@@ -25,7 +25,20 @@
 \usepackage{color}
 \newcommand{\XXX}[1]{{\bf\color{red} #1}}
 
+
+\newcommand{\hoaretrip}[3]{\left\{ #1 \right\} #2 \left\{ #3 \right\}}
+\newcommand{\hoareproc}[6]{#1 \vdash \left\{\left\{ #2 \right\}\right\} \left\{ #3 \right\} #4 \left\{ #5 \right\} \left\{\left\{ #6 \right\}\right\}}
+\newcommand{\hoarestmt}[7]{#1; #2 \vdash \left\{\left\{ #3 \right\}\right\} \left\{ #4 \right\} #5 \left\{ #6 \right\} \left\{\left\{ #7 \right\}\right\}}
+
+\def\imp{\rightarrow}
+\usepackage{amsmath,amssymb}
+\def\nimp{\nrightarrow}
+
+\usepackage{resizegather}
+
 \newcommand{\coqsize}{\scriptsize}
+
+\usepackage{proof}
 
 \title{RoosterFS \\ {\Large CS260 Project Writeup}}
 \author{Rob Bowden, David Holland, Eric Lu}

@@ -512,8 +512,8 @@ Definition example2 :=
 
 Lemma example2_sound : forall lk_invs,
   {{{ lk_invs }}}
-  {{{ fun _ => emp }}} {{{ fun _ => emp }}} example2 
-    {{{ fun _ => fun _ => emp }}} {{{ fun a => fun r => !!(r = a)}}}.
+  {{{ a_emp }}} {{{ a_emp }}} example2 
+    {{{ ar_emp }}} {{{ fun a => fun r => !!(r = a)}}}.
 Proof.
   intro; unfold example2; apply ht_proc; intros.
   eapply ht_seq.
@@ -524,10 +524,10 @@ Proof.
   (* Shouldn't it know this was the arg? *)
   instantiate (1:=a).
   apply ht_return; normalize.
-  instantiate (1:=(fun _ => emp)).
+  instantiate (1:=e_emp).
   intros; intro; intro; trivial.
   intros.
-  instantiate (1:=(fun _ => emp)).
+  instantiate (1:=e_emp).
   apply andp_right;
   unfold eval_expr.
   rewrite H.

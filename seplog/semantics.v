@@ -142,7 +142,7 @@ Section Stacks.
 
 Inductive Stack: Type :=
 | stack_empty: Stack
-| stack_pending: Locals -> var -> Stack -> Stack
+| stack_pending: Locals -> Stack -> stmt -> Stack
 | stack_top: Locals -> Stack -> stmt -> Stack
 .
 
@@ -156,16 +156,16 @@ Inductive CallSteps: Stack -> Locals -> stmt ->
      CallSteps stk loc (s_call (mkvar rt retid)
                                (mkproc rt (mkvar pt paramid) decls body)
                                arg)
-               (stack_pending loc (mkvar rt retid) stk)
+               (stack_pending loc stk (s_assign (mkvar rt retid) (e_value rt v_undef)))
                newloc
                body
 .
 
 Inductive ReturnSteps: Stack -> Locals -> stmt ->
                         Stack -> Locals -> stmt -> Prop :=
-| return_steps: forall loc loc' rt retid stk ret retval,
+| return_steps: forall loc loc' rt retid stk ejunk ret retval,
      ExprYields rt loc ret retval ->
-     ReturnSteps (stack_pending loc' (mkvar rt retid) stk) loc (s_return ret)
+     ReturnSteps (stack_pending loc' stk (s_assign (mkvar rt retid) ejunk)) loc (s_return ret)
                  stk loc' (s_assign (mkvar rt retid) (e_value rt retval))
 .
 

@@ -140,10 +140,10 @@ Definition s_skip: stmt := s_block nil.
 (*
  * Notation
  *)
-
-Notation "[{ s1 ; s2 ; }]" :=
-  (s_seq s1 s2) (at level 90, s1 at next level, s2 at next level, format
-"'[v' [{ '[  ' '//' s1 ; '//' s2 ; ']' '//' }] ']'").
+(* The last statement doesn't take a semicolon *)
+Notation "[{ s1 ; .. ; s2 }]" :=
+  (s_seq s1 (.. (s_seq s2 s_skip) ..)) (at level 90, s1 at next level, s2 at next level, format
+"'[v' [{ '[  ' '//' s1 ; '//' .. ; '//' s2 ']' '//' }] ']'").
 
 
 Instance EqDec_var : EqDec (var) := _.

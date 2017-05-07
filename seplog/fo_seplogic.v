@@ -93,8 +93,6 @@ Definition nonfreevars (P: assertion) (x: var) : Prop :=
 Definition subset (S1 S2: var -> Prop) :=
   forall x, S1 x -> S2 x.
 
-(* XXX XXX XXX Change this *)
-
 Function eval_expr (e : expr) (rho : Locals) : value :=
   match e with
   | e_read v =>
@@ -446,11 +444,8 @@ Lemma ht_call_nf : forall {retC ret},
 Definition example1 :=
   mkproc t_nat (mkvar t_nat 4) [] ([{
     s_return (e_read (mkvar t_nat 4)) ;
-    s_skip ;
+    s_skip
   }]).
-
-
-
 
 Lemma pre_false : forall rc r lk_invs s QC Q,
   {{ rc }} {{ r }} {{ lk_invs }} ||-
@@ -507,7 +502,7 @@ Qed.
 Definition example2 :=
   mkproc t_nat (mkvar t_nat 4) [] ([{
     s_call (mkvar t_nat 5) example1 (e_read (mkvar t_nat 4)) ;
-    s_return (e_read (mkvar t_nat 5)) ;
+    s_return (e_read (mkvar t_nat 5))
   }]).
 
 Lemma example2_sound : forall lk_invs,
@@ -523,6 +518,7 @@ Proof.
 
   (* Shouldn't it know this was the arg? *)
   instantiate (1:=a).
+  eapply ht_seq.
   apply ht_return; normalize.
   instantiate (1:=e_emp).
   intros; intro; intro; trivial.
@@ -538,4 +534,12 @@ Proof.
   unfold eval_expr.
   rewrite H.
   trivial.
+  apply ht_skip.
 Qed.
+
+Definition lock_nat_even := 
+  mkproc t_nat (mkvar (t_addr (t_lock t_nat)) 0) [] ([{
+    s_skip ;
+    s_skip ;
+    s_skip
+  }]).

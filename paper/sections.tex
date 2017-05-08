@@ -12,14 +12,14 @@ As such, their correctness is fundamental to the integrity and
 reliability of operating systems and thus of all higher-level
 application software running on those systems.
 Data loss and corruption bugs are regularly found in existing
-file systems, even widely used ones \cite{yang2006explode},
+file systems, even widely used ones~\cite{yang2006explode},
 and loss of persistent data is inherently more serious and has broader
 ramifications than kernel bugs that merely require rebooting.
 Therefore, proving the functional correctness of file systems is
 highly desirable.
 
 Formal verification of software systems is already a
-nontrivial task in general\footnote{
+nontrivial task in general\footnote{\
 ``seL4 took
 \textit{twenty person-years}!!!''},
 but for file systems an additional difficulty arises:
@@ -69,7 +69,7 @@ The full specification of a file system includes recovery conditions
 that describe the guarantees made to applications about the state of
 files and other file system objects after a crash occurs.
 
-Chen at al \cite{chen2015using} introduced the concept of \emph{crash
+Chen et al.~\cite{chen2015using} introduced the concept of \emph{crash
 Hoare logic} for reasoning about persistent state in the presence of
 arbitrary crashes.
 This work introduced the concept of crash conditions, but it does not
@@ -96,20 +96,19 @@ Ultimately, having proven the logic sound, we still intend to use the
 concurrent crash Hoare logic to build a fully concurrent file system.
 
 In the remainder of this paper we first discuss related work
-(Section \ref{sec:relwork}), then introduce the language and the
-small-step operational semantics we use as a basis (Section
-\ref{sec:semantics}).
-In Section \ref{sec:logic} we describe the program logic.
-Then in Section \ref{sec:eval} we discuss our examples and an
+(Section~\ref{sec:relwork}), then introduce the language and the
+small-step operational semantics we use as a basis (Section~\ref{sec:semantics}).
+In Section~\ref{sec:logic} we describe the program logic.
+Then in Section~\ref{sec:eval} we discuss our examples and an
 evaluation of the usefulness of the logic.
-Finally we discuss future work (Section \ref{sec:future}) and in
-Section \ref{sec:conclusions} conclude.
+Finally we discuss future work (Section~\ref{sec:future}) and in
+Section~\ref{sec:conclusions} conclude.
 
 \section{Related Work}
 \label{sec:relwork}
 
 \subsection{Separation logic}
-Separation logic \cite{reynolds2002separation} introduced an intuitive way to
+Separation logic~\cite{reynolds2002separation} introduced an intuitive way to
 \textit{reason locally} about programs that update heap values.
 The program heap is a
 mapping from addresses to values.
@@ -132,7 +131,7 @@ automatic garbage collection as opposed to manual memory management.)
 
 We have a binary separating conjunction operator ($\ast$) and
 a unit $\emp$ (which describes the empty heap) with the following
-properties\footnote{
+properties\footnote{\
 Traditional separation logic also has a separating implication operator
 ($-\!\!\ast$),
 % this could be \rightspoon but I don't seem to have the right tex packages
@@ -159,7 +158,7 @@ Using the separating conjunction, we can create a judgement of the form:
 This judgement holds if and only if $h$ is exactly the heap with two allocated
 addresses, $10$ pointing to $20$ and $15$ pointing to $5$.
 
-Separation logic extends traditional Hoare logic \cite{hoare1969axiomatic} with
+Separation logic extends traditional Hoare logic~\cite{hoare1969axiomatic} with
 the frame rule:
 
 \[
@@ -176,12 +175,12 @@ back in after the procedure call.
 The ability to reason locally about the heap naturally led to attempting to
 reason about shared state in concurrent programs.
 This gave rise to concurrent
-separation logic \cite{o2007resources}.
-Given a binary operator $C_1 ~||~ C_2$ that
+separation logic~\cite{o2007resources}.
+Given a binary operator $C_1~||~C_2$ that
 runs commands $C_1$ and $C_2$ in parallel, we have the rule:
 
 \[
-    \infer{\hoaretrip{P * P'}{C_1 ~||~ C_2}{Q * Q'}}{\hoaretrip{P}{C_1}{Q} &
+    \infer{\hoaretrip{P * P'}{C_1~||~C_2}{Q * Q'}}{\hoaretrip{P}{C_1}{Q} &
                                                      \hoaretrip{P'}{C_2}{Q'}}
 \]
 
@@ -198,7 +197,7 @@ atomically (using an implicit lock associated with $r$),
 spinning until condition $b$ becomes true.
 We do not use this model.
 Instead, we model locks explicitly, as was done in Hobor et al.'s work on
-formulating a concurrent separation logic for C \cite{hobor2008oracle}.
+formulating a concurrent separation logic for C~\cite{hobor2008oracle}.
 As such, we have rules for both acquiring and
 releasing a lock.
 Loosely, the rules look like:
@@ -239,21 +238,21 @@ not meet the pre-condition of putlock, which includes $R$.
 In parallel with concurrent separation logic, other methods arose to
 reason about concurrent programs.
 For example,
-rely-guarantee \cite{jones1981development} explicitly models interference
+rely-guarantee~\cite{jones1981development} explicitly models interference
 (whereas concurrent separation logic is premised on the assumption that most
 programs rarely interfere).
-The Views metaframework \cite{dinsdale2013views} is a
+The Views metaframework~\cite{dinsdale2013views} is a
 general framework that can be used to prove the soundness of various
 compositional reasoning strategies for concurrent programs, and has been shown
 to generalize both rely-guarantee and concurrent separation logic.
 
-Most similar to our own efforts, Ntzik et al. extend the Views framework to
-allow for concurrent fault-tolerant resource reasoning \cite{ntzik2015fault}.
+Most similar to our own efforts, Ntzik et al.\ extend the Views framework to
+allow for concurrent fault-tolerant resource reasoning~\cite{ntzik2015fault}.
 They split pre-conditions and post-conditions into separate volatile
 (memory-related) and durable (disk-related) conditions, with separate,
 frame-rulable crash invariants.
 They use their logic to reason about
-ARIES \cite{ntzik2015fault}, a write-ahead logging recovery algorithm.
+ARIES~\cite{ntzik2015fault}, a write-ahead logging recovery algorithm.
 However,
 their logic rules differ from our own \XXX{how? that's the point of
 having this here}, and they do not demonstrate an actual
@@ -262,9 +261,9 @@ We are interested in the
 relationship between our own concurrent crash Hoare logic and their
 fault-tolerant resource reasoning.
 
-The Verified Software Toolchain \cite{appel2014program} is an ongoing effort to
+The Verified Software Toolchain~\cite{appel2014program} is an ongoing effort to
 allow for functional verification of real C code in Coq that can be immediately
-compiled by the CompCert \cite{leroy2009formal} verified C compiler to machine
+compiled by the CompCert~\cite{leroy2009formal} verified C compiler to machine
 code.
 While their separation logic framework has been used to prove relatively
 substantial programs written in C, their fledgling concurrent separation logic
@@ -284,10 +283,10 @@ but reasoning about functional correctness becomes difficult.
 With multiple concurrent operations and
 updates being buffered, the state of the file system before and after
 any one operation is no longer readily expressible.
-Blom et al. argue that
-this problem may be handled with the use of traces \cite{blom2015history}, in a
+Blom et al.\ argue that
+this problem may be handled with the use of traces~\cite{blom2015history}, in a
 manner similar to how distributed systems implemented using the Verdi framework
-prove functional correctness \cite{wilcox2015verdi}.
+prove functional correctness~\cite{wilcox2015verdi}.
 This is the approach that
 VST is following in the beginnings of their concurrent separation logic, and it
 is the one we take in our specifications.
@@ -295,7 +294,7 @@ is the one we take in our specifications.
 % In this paper, the FSCQ people (+Eddie) discuss approaches, including traces.
 %\cite{chen2015specifying}
 
-Crash Hoare logic \cite{chen2015using} is an extension of Hoare logic that, in
+Crash Hoare logic~\cite{chen2015using} is an extension of Hoare logic that, in
 addition to the regular pre- and post-conditions, has an additional crash
 condition that must hold \textit{at every step} of the execution.
 If a given
@@ -303,10 +302,10 @@ procedure satisfies some crash condition $C$, then in the event of a crash, we
 are guaranteed that $C$ accurately describes the state of the world just before
 the crash.
 Crash Hoare logic is used in the correctness proofs of the
-FSCQ \cite{chen2015using} file system.
+FSCQ~\cite{chen2015using} file system.
 
 \subsection{Verified File Systems}
-FSCQ \cite{chen2015using}, written in the Coq proof assistant, is the
+FSCQ~\cite{chen2015using}, written in the Coq proof assistant, is the
 first file
 system proven to meet a specification that includes crashes, using the
 aforementioned crash Hoare logic.
@@ -322,7 +321,7 @@ along the lines of:
     \left\{ (\mathit{diskblock}\;b \mapsto 10) \ast \mathit{otherblocks} \right\}
 \end{align*}
 
-In the above, the appearance of $\ast ~otherblocks$ on both sides of the Hoare
+In the above, the appearance of $\ast~otherblocks$ on both sides of the Hoare
 triple indicates that the write does not touch the other blocks on
 disk.
 Without
@@ -333,7 +332,7 @@ Our work is directly inspired by FSCQ's use of crash Hoare logic, but there are
 three issues with FSCQ that we aim to fix.
 First, it does not support full
 concurrency.
-Chajed \cite{chajed2017verifying} extends FSCQ to allow for
+Chajed~\cite{chajed2017verifying} extends FSCQ to allow for
 asynchronous reads: if a file system call needs to read from disk, it issues the
 read and restarts the entire call, allowing another file system call to proceed
 while the first waits for the disk read to complete.
@@ -342,7 +341,7 @@ FSCQ to fully concurrent file system calls seems to require fundamental changes
 to its infrastructure.
 
 Second, every write operation to disk requires an explicit disk sync before
-returning\footnote{
+returning\footnote{\
 In fact, it requires four separate syncs.
 }.
 Writes are not buffered in memory, and the post-condition of a write call would
@@ -352,14 +351,14 @@ Finally, related strictly to the logic (and not a restriction on the actual
 implementation), the specification does not seem to be able to make full use of
 the power of separation logic.
 In the specification for \texttt{writeblock}
-above, usually separation logic would allow for leaving out $\ast ~otherblocks$
+above, usually separation logic would allow for leaving out $\ast~otherblocks$
 from the pre- and post-conditions, and it would be up to a caller to frame it
 out before making the call.
 Our logic aims to fix these three concerns.
 
 Other verified file systems suffer from similar deficiencies, especially with
 respect to concurrency.
-Cogent \cite{amani2016cogent} is a domain-specific
+Cogent~\cite{amani2016cogent} is a domain-specific
 language that certifiably compiles to C, which can be further compiled to
 machine code by CompCert.
 Proofs in Cogent are at a higher level than low-level
@@ -370,7 +369,7 @@ language.
 However, Cogent's semantics is sequential, and thus while it
 supports asynchronous I/O it does not handle concurrency.
 
-Yggdrasil \cite{sigurbjarnarson2016push} is similarly a higher-level toolkit for
+Yggdrasil~\cite{sigurbjarnarson2016push} is similarly a higher-level toolkit for
 implementing file systems based on crash refinement.
 It uses Z3 as its underlying
 verifier, removing most of the proof burden from the developer.
@@ -416,7 +415,7 @@ to a variable directly; they are commands and not expressions.
 Locks can be thought of as safe handles for global shared objects that
 live in the heap; the logic prevents accessing heap variables without
 holding the locks that protect them.
-This is discussed in Section \ref{sec:logic}.
+This is discussed in Section~\ref{sec:logic}.
 
 The disk, or in fact potentially several disks, are treated as
 additional heaps and accessed via the same load and store operations
@@ -425,18 +424,18 @@ Disk addresses can be protected by locks, but locks may not themselves
 live on disks.
 
 We do not currently have condition variables.
-As seen in e.g. STM Haskell \cite{stmhaskell}, condition variables are
+As seen in e.g.\ STM Haskell~\cite{stmhaskell}, condition variables are
 a performance optimization.
 (It might be an interesting exercise to formulate a more sophisticated
 abstract machine with condition variables and an explicit concept of
 sleeping threads, and prove a refinement.)
 
-The full abstract syntax can be found in Appendix \ref{sec:appendix_ast}.
+The full abstract syntax can be found in Appendix~\ref{sec:appendix_ast}.
 
 \subsection{Semantics}
 
-As noted above expressions are pure (they can only access local
-variables, which are not shared, and are read-only) so the 
+As noted above eXpressions are pure (they can only access local
+variables, which are not shared, and are read-only) so the
 semantics for expression evaluation can be large-step: an expression
 just evaluates to a value.
 (The supply of expressions we support is somewhat limited, because
@@ -464,10 +463,9 @@ Acquiring a lock can only progress if the lock is available, so
 threads waiting for locks cannot step.
 If the system deadlocks, which the logic does not currently attempt to
 prevent, the machine will become unable to step.
-(That this can be construed as a form of crash...)
+(This can be construed as a form of crash.)
 
-The interesting semantic rules can be found in Appendix
-\ref{sec:appendix_semantics}.
+The interesting semantic rules can be found in Appendix~\ref{sec:appendix_semantics}.
 (The standard ones are omitted to save space.)
 
 \subsection{Typing}
@@ -616,7 +614,7 @@ invariant that is pulled into and out of the crash pre-condition and
 post-condition, and $L^r$ is the traditional map from a lock to its associated
 weak invariant that is pulled into and out of the regular pre-condition and
 post-condition.
-Given all this, the rules for lock acquisition and release\footnote{
+Given all this, the rules for lock acquisition and release\footnote{\
 Notice that we avoid
 having to discuss the storage of invariants in the heap.
 Instead, analogously
@@ -669,8 +667,8 @@ in order to execute, then we can completely frame everything related to it out
 of existence (including the lock itself).
 $s$ cannot possibly violate constraint
 $L^c(\ell)$, because everything that the acquisition of $\ell$ pulled in has
-been framed out.
-\footnote{Note that this implies a constraint on the possible
+been framed out.\footnote{\
+Note that this implies a constraint on the possible
 dynamic crash conditions that we can support: a crash condition should
 \textit{only} constrain the use of the resource that the lock
 protects.
@@ -732,7 +730,7 @@ and constraints, which still allows for acquisition of the lock.
 
 We intend to switch to (a form of) the alternative frame rule, but we currently
 have implemented the two separate frame rules.
-See Section \ref{sec:future} for a discussion
+See Section~\ref{sec:future} for a discussion
 of why the frame rule (and more fundamentally the shape of our Hoare triple)
 might still change further, whereas we expect (but have not yet proven) that
 our two current frame rules are sound.
@@ -1088,7 +1086,7 @@ objects like vnodes, we need to extend the type system of our language
 with at least record types and maybe other things.
 Going back to a model where we can use arbitrary Coq values as program
 values would eliminate this requirement (and was one of the primary
-motivations for wanting to do that)... but in the long run we would
+motivations for wanting to do that), but in the long run we would
 like to be able to extract the file system written in our language,
 compile it to C (or something of the sort) and run it outside of Coq;
 that requires not depending directly on Coq internal phenomena.

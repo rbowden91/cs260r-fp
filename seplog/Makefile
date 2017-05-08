@@ -3,7 +3,7 @@ COQDEP=coqdep
 COQFLAGS=-R VST/msl msl -R VST/veric veric -R VST/compcert compcert
 
 SRCS=\
-	ast.v varmap.v \
+	ast.v varmap.v astfacts.v \
 	semantics.v typing.v oldtyping.v \
 	fo_seplogic.v \
 	typingproofs.v oldtypingproofs.v

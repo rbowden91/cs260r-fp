@@ -17,6 +17,7 @@ The stuff in seplog/ is:
 	varmap.v	Support stuff for maps from variables
 			(exists to semi-hide whether variables are
 			identified by nats or strings)
+	astfacts.v	Facts (and support logic) about the abstract syntax
 	table.v		A different thing for mapping variables (obsolete)
 	typing.v	Soundness (typing and structural) properties
 			on the ast

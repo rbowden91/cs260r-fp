@@ -1,0 +1,46 @@
+The code associated with the cs260 project submission is here:
+
+	seplog/
+
+To build it, do the following:
+	cd seplog
+	(cd VST/compcert/lib && coqc Coqlib.v)
+	(cd VST/msl && make)
+	(cd VST/veric && make)
+	make
+
+The stuff from VST is the separation algebra, not their separation
+logic per se.
+
+The stuff in seplog/ is:
+	ast.v		The abstract syntax for the language
+	varmap.v	Support stuff for maps from variables
+			(exists to semi-hide whether variables are
+			identified by nats or strings)
+	table.v		A different thing for mapping variables (obsolete)
+	astprops.v	Soundness (typing and structural) properties
+			on the ast (should be renamed)
+	semantics.v	Small-step operational semantics
+	fo_seplogic.v	The logic
+	type_soundness.v   Partial soundness proofs for the typing properties
+
+The vfs stuff and file system skeleton matching the vfs stuff is not
+in here because it stopped building at a point where fixing it was not
+on the critical path. If you want to look at it, it's in src/.
+
+Other stuff at the top level is:
+
+	compcert/	empty
+	paper/		tex source for the writeup
+	presentation/	loose bits for the previous presentation
+	proposal/	tex source for the project proposal document
+	readvar/	original stuff for using arbitrary coq types as
+			program values (with variable read and write
+			operations that coq accepts)
+	roosterfs/	original start on writing a filesystem
+			(got stuck on non-finalized AST)
+	scratch/	old stuff of Rob's
+	src/		tree where everything but the logic got pulled
+			together (has the vfs code and specifications)
+	stuff/		other old stuff, including a very early cache model
+	vfs/		old stuff of David's

@@ -127,73 +127,6 @@ with
 .
 
 
-(*
- * uniqueness
- *)
-
-(*
- * This differs in that the environment doesn't nest. Also,
- * it doesn't reason about exprs; it relies on Typed to
- * make sure they refer only to variables that exist.
- *)
-
-Inductive VarsUniqueStmt: stmt -> VarMap unit -> Prop :=
-| vars_unique_skip:
-     VarsUniqueStmt s_skip (VarMap_empty unit)
-| vars_unique_seq: forall s1 env s2 env',
-     VarsUniqueStmt s1 env ->
-     VarsUniqueStmt s2 env' ->
-     VarMapDisjoint unit env env' ->
-     VarsUniqueStmt (s_seq s1 s2) (VarMap_union env env')
-| vars_unique_start: forall p e,
-     VarsUniqueProc p ->
-     VarsUniqueStmt (s_start p e) (VarMap_empty unit)
-| vars_unique_assign: forall x e,
-     VarsUniqueStmt (s_assign x e) (VarMap_empty unit)
-| vars_unique_load: forall x l,
-     VarsUniqueStmt (s_load x l) (VarMap_empty unit)
-| vars_unique_store: forall l e,
-     VarsUniqueStmt (s_store l e) (VarMap_empty unit)
-| vars_unique_if: forall pred ts fs env't env'f,
-     VarsUniqueStmt ts env't ->
-     VarsUniqueStmt fs env'f ->
-     VarMapDisjoint unit env't env'f ->
-     VarsUniqueStmt (s_if pred ts fs) (VarMap_union env't env'f)
-| vars_unique_while: forall cond body env'body,
-     VarsUniqueStmt body env'body ->
-     VarsUniqueStmt (s_while cond body) env'body
-| vars_unique_call: forall x p arg,
-     VarsUniqueProc p ->
-     VarsUniqueStmt (s_call x p arg) (VarMap_empty unit)
-| vars_unique_return: forall e,
-     VarsUniqueStmt (s_return e) (VarMap_empty unit)
-| vars_unique_getlock: forall t id,
-     VarsUniqueStmt (s_getlock (mkvar (t_lock t) id)) (VarMap_empty unit)
-| vars_unique_putlock: forall t id,
-     VarsUniqueStmt (s_getlock (mkvar (t_lock t) id)) (VarMap_empty unit)
-with
-
-(*Inductive*) VarsUniqueVardecls: list vardecl -> VarMap unit -> Prop :=
-| vars_unique_vardecls_nil:
-     VarsUniqueVardecls [] (VarMap_empty unit)
-| vars_unique_vardecls_cons: forall x e env0 decls env,
-     env0 = VarMap_add x tt(*unit*) (VarMap_empty unit) ->
-     VarsUniqueVardecls decls env ->
-     VarMapDisjoint unit env0 env ->
-     VarsUniqueVardecls ((mkvardecl x e) :: decls) (VarMap_union env0 env)
-with
-
-(*Inductive*) VarsUniqueProc: proc -> Prop :=
-| vars_unique_proc: forall rt x decls body env_a env_d env_b,
-     env_a = (VarMap_add x tt(*unit*) (VarMap_empty unit)) ->
-     VarsUniqueVardecls decls env_d ->
-     VarMapDisjoint unit env_a env_d ->
-     VarsUniqueStmt body env_b ->
-     VarMapDisjoint unit env_a env_b ->
-     VarMapDisjoint unit env_d env_b ->
-     VarsUniqueProc (mkproc rt x decls body)
-.
-
 
 (* check that procedure returns are ok *)
 
@@ -216,12 +149,10 @@ with
 
 
 Definition StmtOk s : Prop :=
-   (forall env, StmtTyped env s) /\
-   (forall env, VarsUniqueStmt s env)
+   forall env, StmtTyped env s
 .
 
 Definition ProcOk pt rt (p: proc): Prop :=
    (ProcTyped pt rt p) /\
-   (VarsUniqueProc p) /\
    ProcReturnOk rt p
 .

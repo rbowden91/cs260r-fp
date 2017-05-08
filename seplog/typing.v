@@ -43,6 +43,10 @@ Inductive ExprTyped: forall (t: type), VarMap type -> expr -> Prop :=
 | e_value_typed: forall (t: type) env k,
      type_of_value k = t ->
      ExprTyped t env (e_value t k)
+| e_getlockaddr_typed: forall (t: type) env e,
+     (* XXX is this right? *)
+     ExprTyped (t_lock t) env e ->
+     ExprTyped (t_addr t) env (e_getlockaddr t e)
 | e_read_typed: forall (t: type) env id,
      VarMapMapsTo (mkvar t id) t env ->
      ExprTyped t env (e_read (mkvar t id))
@@ -51,6 +55,10 @@ Inductive ExprTyped: forall (t: type), VarMap type -> expr -> Prop :=
      ExprTyped t env te ->
      ExprTyped t env fe ->
      ExprTyped t env (e_cond t pred te fe)
+| e_natbinop_typed: forall f env e1 e2,
+     ExprTyped t_nat env e1 ->
+     ExprTyped t_nat env e2 ->
+     ExprTyped t_nat env (e_natbinop f e1 e2)
 .
 
 Inductive StmtTyped: VarMap type -> stmt -> Prop :=

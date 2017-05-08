@@ -160,6 +160,7 @@ Section Expressions.
 Inductive ExprYields: forall t, Locals -> expr -> value -> Prop :=
 | value_yields: forall loc t a,
     ExprYields t loc (e_value t a) a
+(* XXX THERE'S NOTHING HERE FOR GETLOCKADDR *)
 | read_yields: forall loc t (x : var) id a,
     (* XXX tidy this *)
     type_of_value a = t ->
@@ -173,6 +174,10 @@ Inductive ExprYields: forall t, Locals -> expr -> value -> Prop :=
     ExprYields t_bool loc e v_false ->
     ExprYields t loc ef a ->
     ExprYields t loc (e_cond t e et ef) a
+| natbinop_yields: forall loc e1 e2 f n1 n2,
+    ExprYields t_nat loc e1 (v_nat n1) ->
+    ExprYields t_nat loc e2 (v_nat n2) ->
+    ExprYields t_nat loc (e_natbinop f e1 e2) (v_nat (f n1 n2))
 .
 
 End Expressions.

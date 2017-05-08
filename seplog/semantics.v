@@ -160,6 +160,7 @@ Section Expressions.
 Inductive ExprYields: forall t, Locals -> expr -> value -> Prop :=
 | value_yields: forall loc t a,
     ExprYields t loc (e_value t a) a
+(* XXX THERE'S NOTHING HERE FOR GETLOCKADDR *)
 | read_yields: forall loc t (x : var) id a,
     (* XXX tidy this *)
     type_of_value a = t ->

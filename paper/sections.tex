@@ -370,7 +370,7 @@ language.
 However, Cogent's semantics is sequential, and thus while it
 supports asynchronous I/O it does not handle concurrency.
 
-Yggdrasil\cite{sigurbjarnarson2016push} is similarly a higher-level toolkit for
+Yggdrasil \cite{sigurbjarnarson2016push} is similarly a higher-level toolkit for
 implementing file systems based on crash refinement.
 It uses Z3 as its underlying
 verifier, removing most of the proof burden from the developer.
@@ -382,43 +382,158 @@ systems implemented using Yggdrasil are limited to single-threaded code.
 \section{Language and Semantics}
 \label{sec:semantics}
 
+In order to support concurrency we need a language where executions
+can be finely interleaved, and a small-step semantics so that these
+interleavings can be formally defined and reasoned about.
+In order to mechanize the logic and proofs in Coq this means defining
+an abstract syntax and a semantics, and then writing our concurrent
+file system code in the abstract syntax.
+(By comparison, in FSCQ, the only steps involve updating the disk and
+everything in between is pure-functional Coq code.)
+
+Our language \textsc{Chimp} (Concurrent/Crash Hoare \textsc{Imp}) is
+basic \textsc{Imp} extended with a minimal set of features necessary
+for writing nontrivial concurrent code:
+\begin{itemize}
+\item procedures and procedure calls/returns;
+\item a \texttt{start} operation to fork a new thread;
+\item local variables declared in procedures;
+\item \texttt{load} and \texttt{store} to access the heap;
+\item \texttt{getlock} and \texttt{putlock} to handle locks;
+\item and simple explicit types.
+\end{itemize}
+
+Local variables are private to the procedures they appear in.
+Forking a new thread always invokes a procedure with a new set of
+local variables.
+
+Expressions are pure so we can have a big-step semantics for
+evaluating them.
+This simplifies a number of things greatly.
+Both the load and procedure call operations always assign the results
+to a variable directly; they are commands and not expressions.
+
+Locks can be thought of as safe handles for global shared objects that
+live in the heap; the logic prevents accessing heap variables without
+holding the locks that protect them.
+This is discussed in Section \ref{sec:logic}.
+
+The disk, or in fact potentially several disks, are treated as
+additional heaps and accessed via the same load and store operations
+as in-memory variables.
+Disk addresses can be protected by locks, but locks may not themselves
+live on disks.
+
+We do not currently have condition variables.
+As seen in e.g. STM Haskell \cite{stmhaskell}, condition variables are
+a performance optimization.
+(It might be an interesting exercise to formulate a more sophisticated
+abstract machine with condition variables and an explicit concept of
+sleeping threads, and prove a refinement.)
+
+The full abstract syntax can be found in Appendix \ref{sec:appendix_ast}.
+
+\subsection{Semantics}
+
+As noted above expressions are pure (they can only access local
+variables, which are not shared, and are read-only) so the 
+semantics for expression evaluation can be large-step: an expression
+just evaluates to a value.
+(The supply of expressions we support is somewhat limited, because
+originally program values were arbitrary Coq values and thus any Coq
+expression could be trivially embedded.)
+
+The rest of the language semantics are written in four layers: one for
+ordinary commands/statements (including those that access the heap),
+one for the call and return stack, one for threads (which is currently
+pass-through but might not be in the future), and one for the complete
+machine with threads executing in parallel.
+Lock operations happen at the command level, because (at least for
+semantic purposes) the lock state, though separate from heap data, is
+rolled in with the heap.
+This might or might not have been a mistake.
+(The semantics of the lock operations have changed repeatedly to suit
+the needs of the logic.)
+Starting a new thread is effectively calling a procedure in a new
+thread context, so it happens mostly at the stack level: a new stack
+is created and this is then reflected up to the machine level as a new
+thread.
+At the machine level, the machine nondeterministically chooses a
+thread to run and steps it once.
+Acquiring a lock can only progress if the lock is available, so
+threads waiting for locks cannot step.
+If the system deadlocks, which the logic does not currently attempt to
+prevent, the machine will become unable to step.
+(That this can be construed as a form of crash...)
+
+The interesting semantic rules can be found in Appendix
+\ref{sec:appendix_semantics}.
+(The standard ones are omitted to save space.)
+
+\subsection{Typing}
+
+We originally wanted to use arbitrary Coq values as program values,
+for a wide range of reasons.
+Doing that while not requiring a separate variable environment for
+every type requires wrapping up a Coq type and value of that type
+inside a value object; extracting these and using the values requires
+proving to Coq that the type wrapped up in a value is the type it
+ought to be.
+This in turn requires a set of soundness propositions on the abstract
+syntax.
+These propositions were not a type system in the usual sense, but they
+were structurally equivalent to one.
+Later on we gave up on using arbitrary Coq values; the existing
+soundness propositions became very similar ones implementing
+a simple type system.
+
+The motivation for worrying about typing, and, indeed, proving
+soundness of the typing in terms of preservation and progress, was not
+typing per se (largely irrelevant to the project goals) but using the
+types as a lever for debugging the semantics.
+The soundness of the \emph{logic} is of critical importance; the logic
+is sound only with respect to the semantics; and the logic soundness
+proofs are far more complicated and harder than type system proofs.
+Problems with the semantics that make the logic proofs just not work
+can be detected and understood in the context of the type system.
+%(For this reason the proofs are only partial -- the completed parts
+%are the parts that were either straightforward or interesting in this
+%context.)
+
+The experience of updating the typing proofs as the abstract syntax
+and semantics have shifted under the demands of the logic has been
+valuable in its own right, in a long-term sense.
+
+None of the typing judgments (or other structural soundness
+constraints on the abstract syntax) are interesting in themselves, and
+so none are exhibited in the Appendix.
+
+% Stuff from Rob's original Language section that isn't (yet?) in the
+% text above.
+%
+% ...
+%In their ongoing efforts at a concurrent separation logic, Chen et al.\ have
+%added acquiring and releasing locks to the list of steps (but removed sync and
+%trim).
+% ...
+%the write-ahead logging invariant depends on the contents of
+%memory as much as it depends on disk (in-memory log entries need to
+%be written out to disk before the relevant in-memory buffers)
+% ...
+%It is possible that,
+%strictly for the purposes of verifying a file system like FSCQ, we
+%could have gotten away with just adding heap manipulation and lock
+%operations, performing everything in between in pure Coq.
+%   - Rob
+%Maybe; you'd have to treat the local environment as a monad. It
+%might work. Far from clear if it would be preferable, either as
+%a way of writing things down or as a representation for reasoning
+%about them. Monad code basically unfolds to continuations and
+%continuations suck.
+%   - David
+
 \section{Crash Concurrent Separation Hoare Logic}
 \label{sec:logic}
-
-\subsection{Language}
-
-A single ``step'' in the execution of FSCQ proceeds from one disk operation
-(read, write, sync, or trim) to the next.
-Everything in between disk operations
-is pure functional Coq code, since in FSCQ, crash conditions only need to
-describe disk state anyway, and recovery code can only reason about disk state.
-In their ongoing efforts at a concurrent separation logic, Chen et al.\ have
-added acquiring and releasing locks to the list of steps (but removed sync and
-trim).
-
-Because the write-ahead logging invariant depends on the contents of memory as
-much as it depends on disk (in-memory log entries need to be written out to disk
-before the relevant in-memory buffers), we need, in addition to lock acquire and
-release and disk read and write operations, heap load and store
-operations.
-More
-generally, the language needs to support atomic steps for whatever type of
-``crash invariants'' we want to support.
-As such, we modeled an imperative
-language with pure expressions, conditions, loops, procedure calls, local
-variable and shared heap manipulation, lock operations, and thread
-spawning.
-\footnote{See the full language in the appendix.
-It is possible that,
-strictly for the purposes of verifying a file system like FSCQ, we could have
-gotten away with just adding heap manipulation and lock operations, performing
-everything in-between in pure Coq.
-We are not sure of this, and it was a
-realization that came about only in finalizing corner cases of the logic in the
-imperative language.}
-
-%The disk operations are not statements of the language,
-%but rather disk operations with implied values.
 
 \subsection{Semantics}
 
@@ -934,5 +1049,8 @@ could potentially use Coq values directly.
 
 \appendix
 \section{Language}
+\label{sec:appendix_ast}
 \section{Semantics}
+\label{sec:appendix_semantics}
 \section{Proof Rules}
+\label{sec:appendix_logic}

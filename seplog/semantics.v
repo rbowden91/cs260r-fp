@@ -66,23 +66,6 @@ Definition set_locals (v : var) (val : value) (rho : Locals) : Locals :=
   | mkvar t n => NatMap.add n val rho
   end.
 
-Definition get_heap (rho : Heap) (a : addr) : option value :=
-  match a with
-  | mkaddr t n b =>
-       match rho with
-       | mkheap memory _ _ =>  NatMap.find n memory
-       end
-  end.
-
-Definition set_heap (a : addr) (val : value) (rho : Heap) : Heap :=
-  match a with
-  | mkaddr t n b =>
-       match rho with
-       | mkheap memory lockenv disks =>
-            mkheap (NatMap.add n val memory) lockenv disks
-       end
-  end.
-
 Definition heap_get_data (whichheap: WhichHeap) (index: nat) (h: Heap):
                                 option value :=
    match h with
@@ -114,6 +97,47 @@ Definition heap_set_data (whichheap: WhichHeap) (index: nat)
              end
         end
    end.
+
+Definition get_heap (rho : Heap) (a : addr) : option value :=
+  match a with
+  | mkaddr t n which => heap_get_data which n rho
+  end.
+  (*
+  match rho with
+  | mkheap mem lk disks =>
+    match a with
+    | mkaddr t n which =>
+      match which with
+      | MemoryHeap => NatMap.find n mem
+      | DiskHeap d =>
+        match NatMap.find d disks with
+        | None => None
+        | Some disk => NatMap.find n disk
+        end
+      end
+    end
+  end.*)
+
+Definition set_heap (a : addr) (val : value) (rho : Heap) : Heap :=
+  match a with
+  | mkaddr t n which => heap_set_data which n val rho
+  end.
+  (*
+  match rho with
+  | mkheap mem lk disks =>
+    match a with
+    | mkaddr t n which =>
+      match which with
+      | MemoryHeap => mkheap (NatMap.add n val mem) lk disks
+      | DiskHeap d =>
+        match NatMap.find d disks with
+        (* XXX write errors for missing disks? *)
+        | None => rho
+        | Some disk => mkheap mem lk (NatMap.add d (NatMap.add n val disk) disks)
+        end
+      end
+    end
+  end.*)
 
 Definition heap_get_lockstate (index: nat) (h: Heap): option LockState :=
    match h with

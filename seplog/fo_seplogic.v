@@ -417,10 +417,9 @@ Lemma ht_getlock_noex : forall {retC ret lk_invs},
    forall lkptr lktype a,
    P |-- (fun rho => !!(type_of_var v = t_addr (t_lock lktype))) ->
    P |-- (fun rho => !!(get_locals rho v = Some (v_addr lkptr))) ->
-   P |-- (fun rho => !!(eval_expr (t_addr lktype) (e_getlockaddr lk) ->
    (fun rho => ex_mapsto lkptr) |-- C ->
    hoare_stmt retC ret lk_invs
-              C (fun rho => P rho * mapsto lkptr lk)
+              C (fun rho => P rho * mapsto lkptr (v_lock a))
                 (s_getlock v)
               (fun rho => C rho * mapsto lkptr (v_lock a)
                                 * crash_inv lktype a lk_invs)
@@ -641,7 +640,7 @@ Lemma lift_exists : forall CR R L CP s CQ Q A P,
   hoare_stmt CR R L CP (EX a:A, (P a)) s CQ Q.
 Admitted.
 
-(*
+
 Lemma lock_nat_even_sound : forall lkptr,
   {{{ lne_lkinvs }}}
   {{{ (fun a =>
@@ -686,6 +685,8 @@ Proof.
   repeat intro; unfold prop; simpl; auto.
 
   eapply ht_seq.
+Admitted.
+(*
   eapply ht
 
   

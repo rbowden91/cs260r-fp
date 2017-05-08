@@ -535,11 +535,7 @@ so none are exhibited in the Appendix.
 \section{Crash Concurrent Separation Hoare Logic}
 \label{sec:logic}
 
-\subsection{Semantics}
-
-\subsection{Logic}
-
-\subsubsection{Notation}
+\subsection{Notation}
 Because the language is imperative, we are able to take some inspiration from
 the Verified Software Toolchain for the Hoare logic rules.
 On the one hand, we
@@ -575,7 +571,7 @@ and Return rule subsection, respectively.
 We will denote them with the
 contracted notation $L$ and $R$ when the components are not being discussed.
 
-\subsubsection{Lock rules}
+\subsection{Lock rules}
 
 How can a statement take in an invariant that is supposed to hold at every step
 of execution, and ultimately require a \textit{different} invariant after it
@@ -628,7 +624,7 @@ to acquire and release it.}
 \label{fig:locks}
 \end{figure*}
 
-\subsubsection{Frame rules}
+\subsection{Frame rules}
 
 What happens if we try to acquire two completely independent locks, $\ell_1$ and
 $\ell_2$, in sequence? Unfortunately, when we try to acquire $\ell_2$, we could
@@ -770,7 +766,7 @@ our two current frame rules are sound.
 %\footnote{As in the above, this currently depends on
 %a strong lock invariant existing.}
 
-\subsubsection{Rule of consequence}
+\subsection{Rule of consequence}
 
 % XXX return septuple
 % XXX strengthening invariants dynamically
@@ -892,7 +888,7 @@ We use the rule of consequence on the crash
 Now we can apply
 the skip rule with $P=Q$ and $CP=True$, and we are all set.
 
-\subsubsection{Procedure rules}
+\subsection{Procedure rules}
 
 In our language, a statement can call another procedure and can return from
 within a procedure.
@@ -942,7 +938,7 @@ match those of the proven procedure with the input argument passed in,
 we can simply drop in the procedure's post-conditions, parameterized with both
 the input argument and the return value.
 
-\subsubsection{Crash-preserving rules}
+\subsection{Crash-preserving rules}
 
 % XXX is disk model changing by removing the bool?
 

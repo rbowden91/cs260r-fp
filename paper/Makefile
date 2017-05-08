@@ -14,8 +14,8 @@ $(PAPER:.tex=.pdf): $(TEXFILES) $(PAPER:.tex=.bib)
 
 .tex.pdf:
 	pdf$(TEX) $<
-	pdf$(TEX) $<
 	$(BIBTEX) $(PAPER:.tex=)
+	pdf$(TEX) $<
 	pdf$(TEX) $<
 
 clean:

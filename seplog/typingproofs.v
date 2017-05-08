@@ -26,7 +26,7 @@ Require Import semantics.
 (* ************************************************************ *)
 
 (* env is sound relative to tyenv *)
-Definition localenv_sound_new (tyenv: VarMap type) (env: Locals): Prop :=
+Definition localenv_sound (tyenv: VarMap type) (env: Locals): Prop :=
    forall t id,
       VarMapMapsTo (mkvar t id) t tyenv ->
       exists a, NatMap.MapsTo id a env /\ type_of_value a = t.
@@ -34,13 +34,13 @@ Definition localenv_sound_new (tyenv: VarMap type) (env: Locals): Prop :=
 Lemma localenv_sound_addition:
    forall tyenv loc t id a,
    type_of_value a = t ->
-   localenv_sound_new tyenv loc ->
+   localenv_sound tyenv loc ->
    ~(VarMapIn (mkvar t id) tyenv) ->
-   localenv_sound_new
+   localenv_sound
         (VarMap_add (mkvar t id) t tyenv)
         (NatMap.add id a loc).
 Proof.
-   unfold localenv_sound_new.
+   unfold localenv_sound.
    intros.
    destruct (Nat.eq_dec id0 id).
    - subst.
@@ -69,11 +69,11 @@ Qed.
 Lemma localenv_sound_replacement:
    forall tyenv loc t id a,
    type_of_value a = t ->
-   localenv_sound_new tyenv loc ->
+   localenv_sound tyenv loc ->
    VarMapMapsTo (mkvar t id) t tyenv ->
-   localenv_sound_new tyenv (NatMap.add id a loc).
+   localenv_sound tyenv (NatMap.add id a loc).
 Proof.
-   unfold localenv_sound_new.
+   unfold localenv_sound.
    intros.
    destruct (Nat.eq_dec id0 id).
    - subst.
@@ -99,14 +99,14 @@ Proof.
      apply NatMap.add_2; auto.
 Qed.
 
-Lemma StmtStepsPreserves_new :
+Lemma StmtStepsPreserves :
   forall tyenv h l s,
     VarsScopedStmt tyenv s ->
-    localenv_sound_new tyenv l ->
+    localenv_sound tyenv l ->
     forall h' l' s',
        StmtSteps h l s h' l' s' ->
           VarsScopedStmt tyenv s' /\
-          localenv_sound_new tyenv l'.
+          localenv_sound tyenv l'.
 Proof.
   intros.
   revert H0 H. revert tyenv.
@@ -148,11 +148,11 @@ Definition ThreadStateSound tyenv t :=
    | thread (stack_empty) => False
    | thread (stack_frame loc stk s) =>
         VarsScopedStmt tyenv s /\
-        localenv_sound_new tyenv loc (* /\
+        localenv_sound tyenv loc (* /\
         stack_sound tyenv stk *)
    end.
 
-Lemma ThreadStepsPreserves_new:
+Lemma ThreadStepsPreserves:
    forall tyenv h t,
       ThreadStateSound tyenv t ->
       forall h' t',
@@ -164,7 +164,7 @@ Proof.
    induction H0.
    - unfold ThreadStateSound in *.
      destruct H as [H1 H2].
-     apply StmtStepsPreserves_new with
+     apply StmtStepsPreserves with
          (tyenv := tyenv)
             (h := h) (l := loc) (s := s)
             (h' := h') (l' := loc') (s' := s') in H0; auto.
@@ -182,7 +182,7 @@ Proof.
      admit.
 Admitted.
 
-Lemma ThreadStepsStartPreserves_new:
+Lemma ThreadStepsStartPreserves:
    forall tyenv t,
       ThreadStateSound tyenv t ->
       forall t' tnew,
@@ -199,7 +199,7 @@ Definition MachineEnv := nat. (* XXX *)
 Definition MachineStateSound (menv: MachineEnv) (m: Machine) (menv2: MachineEnv) :=
    True. (* XXX *)
 
-Lemma MachineStepsPreserves_new:
+Lemma MachineStepsPreserves:
    forall menv menv2 m,
       MachineStateSound menv m menv2 ->
       forall m',
@@ -210,10 +210,10 @@ Proof.
 Admitted.
 
 
-Lemma ExprStepsProgress_new:
+Lemma ExprStepsProgress:
   forall t tyenv l e,
     VarsScopedExpr t tyenv e ->
-    localenv_sound_new tyenv l ->
+    localenv_sound tyenv l ->
     exists a, ExprYields t l e a.
 Proof.
    intros. revert H H0. revert tyenv l t.
@@ -221,7 +221,7 @@ Proof.
    induction e; intros.
    - subst. exists v. inversion H; subst. apply value_yields.
    - subst. inversion H; subst.
-     unfold localenv_sound_new in H0.
+     unfold localenv_sound in H0.
      apply H0 in H4.
      destruct H4 as [a [H4a H4b]].
      exists a.
@@ -273,10 +273,10 @@ Proof.
    * exists vf. apply cond_false_yields; auto.
 Qed.
 
-Lemma StmtStepsProgress_new:
+Lemma StmtStepsProgress:
   forall tyenv h l s,
     VarsScopedStmt tyenv s ->
-    localenv_sound_new tyenv l ->
+    localenv_sound tyenv l ->
     s <> s_skip ->
     (forall p arg, s = s_start p arg -> False) ->
     (forall x p e, s = s_call x p e -> False) ->
@@ -290,7 +290,7 @@ Proof.
   - admit.
   - specialize (H2 p e). contradiction.
   - inversion H; subst.
-    apply ExprStepsProgress_new with (l := l) in H8; auto.
+    apply ExprStepsProgress with (l := l) in H8; auto.
     destruct H8 as [a H8].
     exists h, (NatMap.add id a l), s_skip.
     apply step_assign with (h := h) (loc := l) (id := id) (type := t) (e := e) (a := a).
@@ -311,7 +311,7 @@ Definition threadstmt_is (t: Thread) s0 :=
    | thread (stack_frame loc stk s) => s = s0
    end.
 
-Lemma ThreadStepsProgress_new:
+Lemma ThreadStepsProgress:
    forall tyenv h t,
       ThreadStateSound tyenv t ->
       (forall p arg, threadstmt_is t (s_start p arg) = False) ->
@@ -320,7 +320,7 @@ Lemma ThreadStepsProgress_new:
 Proof.
 Admitted.
 
-Lemma ThreadStepsStartProgress_new:
+Lemma ThreadStepsStartProgress:
    forall tyenv t,
       ThreadStateSound tyenv t ->
       (exists p arg, threadstmt_is t (s_start p arg)) ->
@@ -329,7 +329,7 @@ Lemma ThreadStepsStartProgress_new:
 Proof.
 Admitted.
 
-Lemma MachineStepsProgress_new:
+Lemma MachineStepsProgress:
    forall menv menv2 m,
       MachineStateSound menv m menv2 ->
       exists m',
@@ -349,8 +349,8 @@ Theorem general_soundness_of_ast_and_semantics:
 Proof.
    intros.
    split.
-   - apply MachineStepsProgress_new with (menv := menv) (menv2 := menv2).
+   - apply MachineStepsProgress with (menv := menv) (menv2 := menv2).
      auto.
-   - apply MachineStepsPreserves_new with (menv := menv).
+   - apply MachineStepsPreserves with (menv := menv).
      auto.
 Qed.

@@ -424,7 +424,16 @@ Proof.
      apply step_getlock.
      * apply NatMap.find_1.
        assert (t'a = t) by congruence; subst.
-       (* not clear why this isn't showing up *)
+       (*
+        * This doesn't come out because constructing lock values with
+        * other whichheap values is structurally possible, and the amount
+        * of machinery required to rule out invalid values everywhere is
+        * large and prohibitive. The right solution is to rearrange the
+        * lock values to get rid of the whichheap component. (Also, the
+        * separate layer of the "addr" type should go away; it complicates
+        * all the proofs for no clear benefit. But I don't want to do that
+        * at this stage because it might blow up the logic. (XXX)
+        *)
        assert (whichheap = MemoryHeap) by admit; subst.
        auto.
      * (*
@@ -454,7 +463,7 @@ Proof.
      apply step_putlock.
      * apply NatMap.find_1.
        assert (t'a = t) by congruence; subst.
-       (* not clear why this isn't showing up *)
+       (* see above *)
        assert (whichheap = MemoryHeap) by admit; subst.
        auto.
      * (* here we have to prove that we hold the lock. the logic does that but we don't *)

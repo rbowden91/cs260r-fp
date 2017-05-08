@@ -121,6 +121,14 @@ Qed.
  *    - well-typed expressions always evaluate
  *)
 
+Lemma expr_yields_typed_value:
+   forall t tyenv e l a,
+   VarsScopedExpr t tyenv e -> ExprYields t l e a ->
+   type_of_value a = t.
+Proof.
+   intros; induction H0; inversion H; subst; auto.
+Qed.
+
 Lemma ExprStepsProgress:
   forall t tyenv l e,
     VarsScopedExpr t tyenv e ->

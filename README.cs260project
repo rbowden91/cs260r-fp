@@ -18,11 +18,13 @@ The stuff in seplog/ is:
 			(exists to semi-hide whether variables are
 			identified by nats or strings)
 	table.v		A different thing for mapping variables (obsolete)
-	astprops.v	Soundness (typing and structural) properties
-			on the ast (should be renamed)
+	typing.v	Soundness (typing and structural) properties
+			on the ast
+	oldtyping.v	Older soundness properties on the ast
 	semantics.v	Small-step operational semantics
 	fo_seplogic.v	The logic
-	type_soundness.v   Partial soundness proofs for the typing properties
+	typingproofs.v	Partial soundness proofs for the typing properties
+	oldtypingproofs.v Partial soundness proofs for the old typing properties
 
 The vfs stuff and file system skeleton matching the vfs stuff is not
 in here because it stopped building at a point where fixing it was not

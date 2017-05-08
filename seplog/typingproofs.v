@@ -226,7 +226,7 @@ Proof.
   - split.
     { apply s_skip_typed. }
     inversion H2; subst.
-    apply localenv_sound_replacement with (t := type); auto.
+    apply localenv_sound_replacement with (t := t); auto.
     admit. (* currently don't have types from heap values *)
   - split.
     { apply s_skip_typed. }
@@ -241,50 +241,240 @@ Proof.
   - inversion H1; subst.
     split; auto.
     apply s_skip_typed.
+(* holdup: we don't currently have typing for heap values *)
 Admitted.
 
 (*
  * progress for statements
+ *
+ * this has to be one lemma per statement type, because some are handled at
+ * higher levels and the induction on s_seq blows up horribly if you try it
+ * at this level.
  *)
 
-Lemma StmtStepsProgress:
-  forall tyenv h l s,
-    StmtTyped tyenv s ->
-    localenv_sound tyenv l ->
-    s <> s_skip ->
-    (forall p arg, s = s_start p arg -> False) ->
-    (forall x p e, s = s_call x p e -> False) ->
-    (forall e, s = s_return e -> False) ->
-    exists h' l' s',
-       StmtSteps h l s h' l' s'.
+(* s_skip doesn't step *)
+
+(* this one doesn't even require type soundness or anything else... *)
+Lemma StmtStepsProgress_seq_skip:
+   forall h l s,
+     StmtSteps h l (s_seq s_skip s) h l s.
 Proof.
-  intros tyenv h l s; revert tyenv h l.
-  induction s; intros.
-  - contradiction.
-  - admit.
-  - specialize (H2 p e). contradiction.
-  - inversion H; subst.
-    apply ExprYieldsProgress with (l := l) in H8; auto.
-    destruct H8 as [a H8].
-    exists h, (NatMap.add id a l), s_skip.
-    apply step_assign with (h := h) (loc := l) (id := id) (type := t) (e := e) (a := a).
-    auto.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
+   apply step_next.
+Qed.
+
+(* anything else in s_seq needs to be handled at a higher level *)
+
+(* s_start happens at a higher level *)
+
+(* s_assign *)
+Lemma StmtStepsProgress_assign:
+   forall tyenv h l x e,
+      StmtTyped tyenv (s_assign x e) ->
+      localenv_sound tyenv l ->
+      exists h' l',
+         StmtSteps h l (s_assign x e) h' l' (s_skip).
+Proof.
+   intros.
+   inversion H; subst.
+   apply ExprYieldsProgress with (l := l) in H4; auto.
+   destruct H4 as [a H4].
+   exists h, (NatMap.add id a l).
+   apply step_assign with (h := h) (loc := l) (id := id) (type := t) (e := e) (a := a).
+   auto.
+Qed.
+
+(* s_load *)
+Lemma StmtStepsProgress_load:
+   forall tyenv h l x e,
+      StmtTyped tyenv (s_load x e) ->
+      localenv_sound tyenv l ->
+      exists h' l',
+         StmtSteps h l (s_load x e) h' l' (s_skip).
+Proof.
+   intros.
+   inversion H; subst.
+
+   (* this should be an ltac *)
+   assert (exists addr: value, ExprYields (t_addr t) l e addr) as Haddr by
+      (apply ExprYieldsProgress with (l := l) in H4; auto).
+   destruct Haddr as [addr Haddr].
+   assert (type_of_value addr = t_addr t) by 
+      (apply ExprYieldsPreserves with (l := l) (a := addr) in H4; auto).
+   destruct addr; simpl in H1; try discriminate.
+   - destruct a as [t'a heapaddr whichheap].
+     assert (t'a = t) by congruence; subst.
+     (* don't have typing for heap values yet *)
+     assert (exists a, heap_get_data whichheap heapaddr h = Some a) as Ha by admit.
+     destruct Ha as [a Ha].
+     exists h, (NatMap.add id a l).
+     apply step_load with (heapaddr := heapaddr) (whichheap := whichheap); auto.
+   - destruct a; discriminate.
+(* holdup: we don't have heap types *)
+Admitted.
+
+(* s_store *)
+Lemma StmtStepsProgress_store:
+   forall tyenv h l x e,
+      StmtTyped tyenv (s_store x e) ->
+      localenv_sound tyenv l ->
+      exists h' l',
+         StmtSteps h l (s_store x e) h' l' (s_skip).
+Proof.
+   intros.
+   inversion H; subst.
+   unfold localenv_sound in H0.
+   apply H0 in H4.
+   destruct H4 as [addr [H4a H4b]].
+   destruct addr; simpl in H4b; try discriminate.
+   destruct a as [t'addr hid whichheap].
+
+   (* this should be an ltac *)
+   assert (exists a: value, ExprYields t l e a) as Ha by
+      (apply ExprYieldsProgress with (l := l) in H5; auto).
+   destruct Ha as [a Ha].
+   assert (type_of_value a = t) by 
+      (apply ExprYieldsPreserves with (l := l) (a := a) in H5; auto).
+
+   - exists (heap_set_data whichheap hid a h), l.
+     apply step_store; auto.
+     apply read_yields with (id := lid); auto.
+     apply NatMap.find_1.
+     assert (t'addr = t) by congruence; subst.
+     auto.
+   - destruct a; discriminate.
+Qed.
+
+(* s_if *)
+Lemma StmtStepsProgress_if:
+   forall tyenv h l p st sf,
+      StmtTyped tyenv (s_if p st sf) ->
+      localenv_sound tyenv l ->
+      exists h' l' s',
+         StmtSteps h l (s_if p st sf) h' l' s'.
+Proof.
+   intros.
+   inversion H; subst.
+
+   (* this should be an ltac *)
+   assert (exists pred: value, ExprYields t_bool l p pred) as Hpred by
+      (apply ExprYieldsProgress with (l := l) in H5; auto).
+   destruct Hpred as [pred Hpred].
+   assert (type_of_value pred = t_bool) as Htpred by
+      (apply ExprYieldsPreserves with (l := l) (a := pred) in H5; auto).
+   destruct pred; simpl in Htpred; try discriminate.
+
+   - (* the real case *)
+     destruct b.
+     * exists h, l, st. apply step_if_true. auto.
+     * exists h, l, sf. apply step_if_false. auto.
+   - (* these are bogus *)
+     destruct a; discriminate.
+   - destruct a; discriminate.
+Qed.
+
+(* s_while *)
+Lemma StmtStepsProgress_while:
+   forall tyenv h l e s,
+      StmtTyped tyenv (s_while e s) ->
+      localenv_sound tyenv l ->
+      exists h' l' s',
+         StmtSteps h l (s_while e s) h' l' s'.
+Proof.
+   intros.
+   inversion H; subst.
+
+   (* this should be an ltac *)
+   assert (exists pred: value, ExprYields t_bool l e pred) as Hpred by
+      (apply ExprYieldsProgress with (l := l) in H4; auto).
+   destruct Hpred as [pred Hpred].
+   assert (type_of_value pred = t_bool) as Htpred by
+      (apply ExprYieldsPreserves with (l := l) (a := pred) in H4; auto).
+   destruct pred; simpl in Htpred; try discriminate.
+
+   - (* the real case *)
+     destruct b.
+     * exists h, l, (s_seq s (s_while e s)). apply step_while_true. auto.
+     * exists h, l, s_skip. apply step_while_false. auto.
+   - (* these are bogus *)
+     destruct a; discriminate.
+   - destruct a; discriminate.
+Qed.
+
+(* s_call happens at a higher level *)
+
+(* s_return happens at a higher level *)
+
+(* s_getlock *)
+Lemma StmtStepsProgress_getlock:
+   forall tyenv h l x,
+      StmtTyped tyenv (s_getlock x) ->
+      localenv_sound tyenv l ->
+      exists h' l',
+         StmtSteps h l (s_getlock x) h' l' (s_skip).
+Proof.
+   intros.
+   inversion H; subst.
+   unfold localenv_sound in H0.
+   apply H0 in H3.
+   destruct H3 as [a [H3a H3b]].
+   destruct a; simpl in H3b; try discriminate.
+   - destruct a; discriminate.
+   - destruct a as [t'a heapaddr whichheap].
+     exists (heap_set_lockstate heapaddr LockHeld h), l.
+     apply step_getlock.
+     * apply NatMap.find_1.
+       assert (t'a = t) by congruence; subst.
+       (* not clear why this isn't showing up *)
+       assert (whichheap = MemoryHeap) by admit; subst.
+       auto.
+     * (*
+        * this case is to show that the lock is available, which we can't
+        * show in general unless we go and prove that the code is deadlock-free.
+        *)
+       admit.
+Admitted.
+
+(* s_putlock *)
+Lemma StmtStepsProgress_putlock:
+   forall tyenv h l x,
+      StmtTyped tyenv (s_putlock x) ->
+      localenv_sound tyenv l ->
+      exists h' l',
+         StmtSteps h l (s_putlock x) h' l' (s_skip).
+Proof.
+   intros.
+   inversion H; subst.
+   unfold localenv_sound in H0.
+   apply H0 in H3.
+   destruct H3 as [a [H3a H3b]].
+   destruct a; simpl in H3b; try discriminate.
+   - destruct a; discriminate.
+   - destruct a as [t'a heapaddr whichheap].
+     exists (heap_set_lockstate heapaddr LockAvailable h), l.
+     apply step_putlock.
+     * apply NatMap.find_1.
+       assert (t'a = t) by congruence; subst.
+       (* not clear why this isn't showing up *)
+       assert (whichheap = MemoryHeap) by admit; subst.
+       auto.
+     * (* here we have to prove that we hold the lock. the logic does that but we don't *)
+       admit.
 Admitted.
 
 (**************************************************************)
 (* stacks *)
 
+Definition StackFrameSound tyenv stk :=
+   match stk with
+   | stack_empty => False
+   | stack_frame loc stk' s =>
+        StmtTyped tyenv s /\ localenv_sound tyenv loc
+   end.
+
 (*
  * preservation for stacks
  *)
+
 
 (*
  * progress for stacks

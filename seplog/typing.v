@@ -36,7 +36,7 @@ Require Import varmap.
  *)
 
 (*
- * scoping
+ * typing
  *)
 
 Inductive ExprTyped: forall (t: type), VarMap type -> expr -> Prop :=
@@ -95,9 +95,11 @@ Inductive StmtTyped: VarMap type -> stmt -> Prop :=
      ExprTyped t env e ->
      StmtTyped env (s_return e)
 | s_getlock_typed: forall t env id,
+     VarMapMapsTo (mkvar (t_lock t) id) (t_lock t) env ->
      StmtTyped env (s_getlock (mkvar (t_lock t) id))
 | s_putlock_typed: forall t env id,
-     StmtTyped env (s_getlock (mkvar (t_lock t) id))
+     VarMapMapsTo (mkvar (t_lock t) id) (t_lock t) env ->
+     StmtTyped env (s_putlock (mkvar (t_lock t) id))
 with
 
 (*Inductive*) VardeclTyped: VarMap type -> vardecl ->
@@ -136,6 +138,7 @@ Inductive StmtEndsInReturn: stmt -> type -> Prop :=
 | if_ends_in_return: forall s1 s2 t e,
      StmtEndsInReturn s1 t -> StmtEndsInReturn s2 t ->
      StmtEndsInReturn (s_if e s1 s2) t
+(* we could have a while_ends_in_return, but: don't write stupid code *)
 | return_ends_in_return: forall t e,
      StmtEndsInReturn (s_return e) t
 with

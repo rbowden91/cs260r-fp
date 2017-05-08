@@ -129,7 +129,7 @@ Proof.
    intros; induction H0; inversion H; subst; auto.
 Qed.
 
-Lemma ExprStepsProgress:
+Lemma ExprYieldsProgress:
   forall t tyenv l e,
     VarsScopedExpr t tyenv e ->
     localenv_sound tyenv l ->
@@ -264,7 +264,7 @@ Proof.
   - admit.
   - specialize (H2 p e). contradiction.
   - inversion H; subst.
-    apply ExprStepsProgress with (l := l) in H8; auto.
+    apply ExprYieldsProgress with (l := l) in H8; auto.
     destruct H8 as [a H8].
     exists h, (NatMap.add id a l), s_skip.
     apply step_assign with (h := h) (loc := l) (id := id) (type := t) (e := e) (a := a).

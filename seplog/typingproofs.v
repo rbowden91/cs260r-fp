@@ -13,8 +13,16 @@ Module NatMapFacts := FMapFacts.WFacts_fun Nat_as_OT NatMap.
 
 Require Import ast.
 Require Import varmap.
-Require Import astprops.
+Require Import typing.
 Require Import semantics.
+
+(* ************************************************************ *)
+(* ************************************************************ *)
+(*                                                              *)
+(*                         typing proofs                        *)
+(*                                                              *)
+(* ************************************************************ *)
+(* ************************************************************ *)
 
 (* env is sound relative to tyenv *)
 Definition localenv_sound_new (tyenv: VarMap type) (env: Locals): Prop :=

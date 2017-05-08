@@ -1101,7 +1101,7 @@ Even with the bit of pre-existing machinery that using VST separation algebra
 provides, much more automation (in the form of Ltac) is necessary before using
 CCHL will be tolerable. That said, seeing as how VST has managed to construct
 impressive tactics that make proving C programs relatively painless, we believe
-that this should be possible.
+that this should be possible. Furthermore, in the next seciton
 
 Section\ref{sec:future}.
 
@@ -1142,7 +1142,8 @@ consistent state for recovery to act upon.
 We have toyed with the idea that a solution to this problem is to give each lock
 an explicit type, and all locks of a given type must share the same resource
 invariant, parameterized by the address of the resource that the lock is
-protecting.
+protecting. In fact, this is how we have currently implemented the map from a
+lock to its invariant, and it has worked well in our static-lock language.
 For example, all vnode locks would share the same invariant, as
 applied to the individual vnode they protect.
 This seems like a reasonable proposition from a programming standpoint.
@@ -1151,7 +1152,7 @@ $(L^c,L^r)$ mapping to the left of $\vDash$, parameterized by both lock type and
 address, once again contains all possible strong invariants.
 Here, the strong
 invariants associated with each lock type would constitute the global invariants
-the program adheres to.
+to which the overall program adheres.
 
 As mentioned earlier, there is an alternative frame rule we have not
 yet implemented that combines the two
@@ -1206,7 +1207,12 @@ that requires not depending directly on Coq internal phenomena.
 \label{sec:conclusions}
 
 We have introduced concurrent crash Hoare logic to modularly reason about system
-correctness in the presence of both concurrency and crashes. \XXX{finish}
+correctness in the presence of both concurrency and crashes. We still have a
+long way to go before we can use it to prove a file system correct, including
+developing sufficient tactic support and proving the logic's soundness.
+Nevertheless, our current results are promising. If and when proven sound, CCHL
+stands as the first verified logic for reasoning about the crash-correctness of
+concurrent programs.
 
 %\appendix
 %\section{Language}

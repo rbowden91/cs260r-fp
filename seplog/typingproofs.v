@@ -25,12 +25,22 @@ Require Import semantics.
 (* ************************************************************ *)
 (* ************************************************************ *)
 
-(* env is sound relative to tyenv *)
+(*
+ * support logic
+ *)
+
+(*
+ * property stating that a local variable environment is sound
+ * relative to the typing environment
+ *)
 Definition localenv_sound (tyenv: VarMap type) (env: Locals): Prop :=
    forall t id,
       VarMapMapsTo (mkvar t id) t tyenv ->
       exists a, NatMap.MapsTo id a env /\ type_of_value a = t.
 
+(*
+ * adding a new variable to a localenv is sound given suitable conditions
+ *)
 Lemma localenv_sound_addition:
    forall tyenv loc t id a,
    type_of_value a = t ->
@@ -66,6 +76,9 @@ Proof.
      apply NatMap.add_2; auto.
 Qed.
 
+(*
+ * replacing a value in a localenv is sound given suitable conditions
+ *)
 Lemma localenv_sound_replacement:
    forall tyenv loc t id a,
    type_of_value a = t ->
@@ -99,116 +112,14 @@ Proof.
      apply NatMap.add_2; auto.
 Qed.
 
-Lemma StmtStepsPreserves :
-  forall tyenv h l s,
-    VarsScopedStmt tyenv s ->
-    localenv_sound tyenv l ->
-    forall h' l' s',
-       StmtSteps h l s h' l' s' ->
-          VarsScopedStmt tyenv s' /\
-          localenv_sound tyenv l'.
-Proof.
-  intros.
-  revert H0 H. revert tyenv.
-  induction H1; intros.
-  - inversion H; subst.
-    apply IHStmtSteps in H5; auto.
-    destruct H5 as [H5a H5b].
-    split; auto.
-    apply vars_scoped_seq; auto.
-  - inversion H; subst.
-    split; auto.
-  - split.
-    { apply vars_scoped_skip. }
-    inversion H1; subst.
-    apply localenv_sound_replacement with (t := type); auto.
-    apply expr_yields_typed_value with (tyenv := tyenv) (l := loc) (e := e); auto.
-  - split.
-    { apply vars_scoped_skip. }
-    inversion H2; subst.
-    apply localenv_sound_replacement with (t := type); auto.
-    admit. (* currently don't have types from heap values *)
-  - split.
-    { apply vars_scoped_skip. }
-    inversion H2; subst; auto.
-  - inversion H1; subst.
-    split; auto.
-  - inversion H1; subst.
-    split; auto.
-  - inversion H1; subst.
-    split; auto.
-    apply vars_scoped_seq; auto.
-  - inversion H1; subst.
-    split; auto.
-    apply vars_scoped_skip.
-Admitted.
+(**************************************************************)
+(* expressions *)
 
-Definition ThreadStateSound tyenv t :=
-   match t with
-   | thread (stack_empty) => False
-   | thread (stack_frame loc stk s) =>
-        VarsScopedStmt tyenv s /\
-        localenv_sound tyenv loc (* /\
-        stack_sound tyenv stk *)
-   end.
-
-Lemma ThreadStepsPreserves:
-   forall tyenv h t,
-      ThreadStateSound tyenv t ->
-      forall h' t',
-         ThreadSteps h t h' t' ->
-         ThreadStateSound tyenv t'.
-Proof.
-   intros.
-   destruct H0.
-   induction H0.
-   - unfold ThreadStateSound in *.
-     destruct H as [H1 H2].
-     apply StmtStepsPreserves with
-         (tyenv := tyenv)
-            (h := h) (l := loc) (s := s)
-            (h' := h') (l' := loc') (s' := s') in H0; auto.
-   - (* call *)
-     unfold ThreadStateSound in *.
-     destruct H as [H1 H2].
-     admit.
-   - (* call #2 *)
-     unfold ThreadStateSound in *.
-     destruct H as [Ha Hb].
-     admit.
-   - (* return *)
-     admit.
-   - (* return #2 *)
-     admit.
-Admitted.
-
-Lemma ThreadStepsStartPreserves:
-   forall tyenv t,
-      ThreadStateSound tyenv t ->
-      forall t' tnew,
-         ThreadStepsStart t t' tnew ->
-         exists tyenvnew,
-            ThreadStateSound tyenv t' /\
-            ThreadStateSound tyenvnew tnew.
-Proof.
-   intros.
-   admit.
-Admitted.
-
-Definition MachineEnv := nat. (* XXX *)
-Definition MachineStateSound (menv: MachineEnv) (m: Machine) (menv2: MachineEnv) :=
-   True. (* XXX *)
-
-Lemma MachineStepsPreserves:
-   forall menv menv2 m,
-      MachineStateSound menv m menv2 ->
-      forall m',
-         MachineSteps m m' ->
-         exists menv',
-            MachineStateSound menv' m' menv2.
-Proof.
-Admitted.
-
+(*
+ * preservation and progress for expressions:
+ *    - expressions yield the right type
+ *    - well-typed expressions always evaluate
+ *)
 
 Lemma ExprStepsProgress:
   forall t tyenv l e,
@@ -273,6 +184,61 @@ Proof.
    * exists vf. apply cond_false_yields; auto.
 Qed.
 
+(**************************************************************)
+(* statements *)
+
+(*
+ * preservation for statements
+ *)
+
+Lemma StmtStepsPreserves :
+  forall tyenv h l s,
+    VarsScopedStmt tyenv s ->
+    localenv_sound tyenv l ->
+    forall h' l' s',
+       StmtSteps h l s h' l' s' ->
+          VarsScopedStmt tyenv s' /\
+          localenv_sound tyenv l'.
+Proof.
+  intros.
+  revert H0 H. revert tyenv.
+  induction H1; intros.
+  - inversion H; subst.
+    apply IHStmtSteps in H5; auto.
+    destruct H5 as [H5a H5b].
+    split; auto.
+    apply vars_scoped_seq; auto.
+  - inversion H; subst.
+    split; auto.
+  - split.
+    { apply vars_scoped_skip. }
+    inversion H1; subst.
+    apply localenv_sound_replacement with (t := type); auto.
+    apply expr_yields_typed_value with (tyenv := tyenv) (l := loc) (e := e); auto.
+  - split.
+    { apply vars_scoped_skip. }
+    inversion H2; subst.
+    apply localenv_sound_replacement with (t := type); auto.
+    admit. (* currently don't have types from heap values *)
+  - split.
+    { apply vars_scoped_skip. }
+    inversion H2; subst; auto.
+  - inversion H1; subst.
+    split; auto.
+  - inversion H1; subst.
+    split; auto.
+  - inversion H1; subst.
+    split; auto.
+    apply vars_scoped_seq; auto.
+  - inversion H1; subst.
+    split; auto.
+    apply vars_scoped_skip.
+Admitted.
+
+(*
+ * progress for statements
+ *)
+
 Lemma StmtStepsProgress:
   forall tyenv h l s,
     VarsScopedStmt tyenv s ->
@@ -305,6 +271,80 @@ Proof.
   - admit.
 Admitted.
 
+(**************************************************************)
+(* stacks *)
+
+(*
+ * preservation for stacks
+ *)
+
+(*
+ * progress for stacks
+ *)
+
+(**************************************************************)
+(* threads *)
+
+Definition ThreadStateSound tyenv t :=
+   match t with
+   | thread (stack_empty) => False
+   | thread (stack_frame loc stk s) =>
+        VarsScopedStmt tyenv s /\
+        localenv_sound tyenv loc (* /\
+        stack_sound tyenv stk *)
+   end.
+
+(*
+ * preservation for threads
+ *)
+
+Lemma ThreadStepsPreserves:
+   forall tyenv h t,
+      ThreadStateSound tyenv t ->
+      forall h' t',
+         ThreadSteps h t h' t' ->
+         ThreadStateSound tyenv t'.
+Proof.
+   intros.
+   destruct H0.
+   induction H0.
+   - unfold ThreadStateSound in *.
+     destruct H as [H1 H2].
+     apply StmtStepsPreserves with
+         (tyenv := tyenv)
+            (h := h) (l := loc) (s := s)
+            (h' := h') (l' := loc') (s' := s') in H0; auto.
+   - (* call *)
+     unfold ThreadStateSound in *.
+     destruct H as [H1 H2].
+     admit.
+   - (* call #2 *)
+     unfold ThreadStateSound in *.
+     destruct H as [Ha Hb].
+     admit.
+   - (* return *)
+     admit.
+   - (* return #2 *)
+     admit.
+Admitted.
+
+Lemma ThreadStepsStartPreserves:
+   forall tyenv t,
+      ThreadStateSound tyenv t ->
+      forall t' tnew,
+         ThreadStepsStart t t' tnew ->
+         exists tyenvnew,
+            ThreadStateSound tyenv t' /\
+            ThreadStateSound tyenvnew tnew.
+Proof.
+   intros.
+   admit.
+Admitted.
+
+(*
+ * progress for threads
+ *)
+
 Definition threadstmt_is (t: Thread) s0 :=
    match t with
    | thread (stack_empty) => False
@@ -329,6 +369,31 @@ Lemma ThreadStepsStartProgress:
 Proof.
 Admitted.
 
+(**************************************************************)
+(* machine *)
+
+Definition MachineEnv := nat. (* XXX *)
+Definition MachineStateSound (menv: MachineEnv) (m: Machine) (menv2: MachineEnv) :=
+   True. (* XXX *)
+
+(*
+ * preservation for machines
+ *)
+
+Lemma MachineStepsPreserves:
+   forall menv menv2 m,
+      MachineStateSound menv m menv2 ->
+      forall m',
+         MachineSteps m m' ->
+         exists menv',
+            MachineStateSound menv' m' menv2.
+Proof.
+Admitted.
+
+(*
+ * progress for machines
+ *)
+
 Lemma MachineStepsProgress:
    forall menv menv2 m,
       MachineStateSound menv m menv2 ->
@@ -337,7 +402,10 @@ Lemma MachineStepsProgress:
 Proof.
 Admitted.
 
-Theorem general_soundness_of_ast_and_semantics:
+(**************************************************************)
+(* top level *)
+
+Theorem general_type_soundness_of_ast_and_semantics:
    forall menv menv2 m,
       MachineStateSound menv m menv2 ->
       (exists m',

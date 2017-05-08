@@ -131,7 +131,7 @@ with
 (* check that procedure returns are ok *)
 
 Inductive StmtEndsInReturn: stmt -> type -> Prop :=
-| block_ends_in_return: forall s t e,
+| seq_ends_in_return: forall s t e,
      StmtEndsInReturn (s_seq s (s_return e)) t
 | if_ends_in_return: forall s1 s2 t e,
      StmtEndsInReturn s1 t -> StmtEndsInReturn s2 t ->
@@ -147,7 +147,7 @@ with
 
 
 
-
+(* this is of questionable merit *)
 Definition StmtOk s : Prop :=
    forall env, StmtTyped env s
 .

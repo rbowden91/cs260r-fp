@@ -121,7 +121,7 @@ Qed.
  *    - well-typed expressions always evaluate
  *)
 
-Lemma expr_yields_typed_value:
+Lemma ExprYieldsPreserves:
    forall t tyenv e l a,
    VarsScopedExpr t tyenv e -> ExprYields t l e a ->
    type_of_value a = t.
@@ -183,7 +183,7 @@ Proof.
         auto.
 *)
    remember H6 as H6a. clear HeqH6a.
-   apply expr_yields_typed_value with (tyenv := tyenv) in H6; auto.
+   apply ExprYieldsPreserves with (tyenv := tyenv) in H6; auto.
    destruct pred.
    1-2,4-5,8: unfold type_of_value in H6; discriminate.
    2,3: unfold type_of_value in H6; destruct a; discriminate.
@@ -222,7 +222,7 @@ Proof.
     { apply vars_scoped_skip. }
     inversion H1; subst.
     apply localenv_sound_replacement with (t := type); auto.
-    apply expr_yields_typed_value with (tyenv := tyenv) (l := loc) (e := e); auto.
+    apply ExprYieldsPreserves with (tyenv := tyenv) (l := loc) (e := e); auto.
   - split.
     { apply vars_scoped_skip. }
     inversion H2; subst.

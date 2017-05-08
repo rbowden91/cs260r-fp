@@ -1055,6 +1055,17 @@ to adhere to the lock invariants of the \emph{held} locks.
 we should not be able to prove a Hoare septuple where the preconditions
 already imply a violation of the lock invariants.)
 
+We have not yet completed a proof of this soundness statement.
+However, the given expected form of the statement explains some features
+of the logic.
+For instance, it explains the converse behavior of the rule of consequence for
+crashes.
+The stipulation that the crash pre-condition $CP$
+should constrain the heap state to adhere to the lock invariants of held locks
+may be written as: $\not (CP \implies \not L^C)$;
+that is, we cannot derive a violation of $L^C$ given that $CP$ holds.
+If $CP \implies CP'$ then $CP'$ will also meet this stipulation!
+
 \section{Implementation}
 \label{sec:imp}
 

@@ -92,7 +92,7 @@ for reasoning about concurrent operations even in the face of crashes,
 and second, to take first steps at proving the
 logic sound and provide some simple example code demonstrating that
 the logic is also useful.
-Ultimately, having proven the logic sound, we still intend to use the
+Ultimately, after having proven the logic sound, we intend to use the
 concurrent crash Hoare logic to build a fully concurrent file system.
 
 In the remainder of this paper we first discuss related work
@@ -975,6 +975,79 @@ be sure that the new value being stored at the heap address does not violate any
 strong invariants associated with that heap
 address in our current crash condition.
 
+\subsection{Soundness}
+We would like to demonstrate that our logic accurately describes the properties
+of programs under the semantics we have given.
+At a high level, soundness may
+be stated as: if we were able to prove a Hoare septuple about a program,
+then if the program is executed under the semantics,
+it will preserve the stated lock invariants,
+adhere to the stated crash pre-condition,
+and establish the stated normal post-condition
+given that the initial state of the heap and local variables
+satisfies the pre-condition.
+Note that the crash post-condition is not implicated in this high-level
+description of soundness:
+we do not check explicitly that requiring adherence to the crash post-condition
+that was proven in a Hoare septuple for some statement $s$
+on the part of the crash pre-conditions of statements sequenced onto $s$
+suffices for continued maintenance of the lock invariants
+of the Hoare septuple demonstrated for $s$.
+This is because showing that proving a Hoare septuple is enough
+to guarantee a statement's adherence to the stated lock invariants
+means that the logic is already properly using the crash post-condition
+in the inference rule for sequencing
+to account for which statements may or may not be sequenced.
+
+As of this writing, we are able to state a partial soundness condition
+which guarantees that a heap that contains only a finite list of locks
+adheres to the lock invariants for each of these locks.
+Intuitively, this is not an onerous restriction:
+a program certainly should only ever have a finite list of locks.
+This is also not a reversion to the pre-declared finite list of locks
+maintained by traditional concurrent separation logic, because these locks may
+still inhabit the heap, and the logic might account for growing and shrinking
+the list of extant locks when lock allocation and destruction are
+added to the language and logic.
+The soundness statement is partial because the logic currently underconstrains
+the heap, such that
+it is possible that an enumeration of the heaplets pointed to by each lock
+does not terminate.
+Future work may lift this restriction by
+moving the finite lock list stipulation from the partial soundness statement
+into the logic.
+
+% the wording of the next sentence...
+Proof of soundness for traditional concurrent separation logic proceeds by
+strengthening the high-level violation-freeness soundness statement into
+an invariant which is demonstrated to be preserved by the execution semantics.
+We expect that our proof of soundness will proceed in similar manner.
+We expect the resulting soundness invariant to be as follows:
+
+We will say that a heap is good with respect to this Hoare septuple
+and a state of the local variables
+if it meets the following criteria:
+\begin{enumerate}
+\item it adheres to both the crash and normal pre-conditions
+of the Hoare septuple
+(given the state of the local variables as a parameter);
+\item it contains a finite number of locks, which may be given by a list;
+\item it adheres to the lock invariants of all the \emph{unheld} locks
+in this list.
+\end{enumerate}
+Suppose a statement $s$ satisfies a Hoare septuple.
+Suppose that we then run $s$ some number of steps starting from
+a good heap state $h$ (and concomitant local variables $\rho$),
+reaching a new state $s', h', \rho'$.
+Then we stipulate that there exist new crash and normal pre-conditions
+such that a Hoare septuple may be proven for $s'$.
+The new heap state $h'$ should be good with respect to $\rho'$.
+The new crash pre-condition should additionally constrain the heap state
+to adhere to the lock invariants of the \emph{held} locks.
+(We do not have this as an assumption of the original heap state because
+we should not be able to prove a Hoare septuple where the preconditions
+already imply a violation of the lock invariants.)
+
 \section{Implementation}
 \label{sec:imp}
 
@@ -984,7 +1057,7 @@ There is also a type system for the language, as discussed above.
 
 As of this writing we have partial proofs of the soundness of the type
 system (which serves mostly to validate the semantics) but not much in
-the way of proofs of the logic soundness yet.
+the way of proof that CCSHL is sound with respect to the semantics yet.
 There are some examples using the logic under construction.
 \XXX{update this}
 

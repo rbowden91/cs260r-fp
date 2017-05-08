@@ -123,7 +123,7 @@ Qed.
 
 Lemma ExprYieldsPreserves:
    forall t tyenv e l a,
-   VarsScopedExpr t tyenv e -> ExprYields t l e a ->
+   ExprTyped t tyenv e -> ExprYields t l e a ->
    type_of_value a = t.
 Proof.
    intros; induction H0; inversion H; subst; auto.
@@ -131,7 +131,7 @@ Qed.
 
 Lemma ExprYieldsProgress:
   forall t tyenv l e,
-    VarsScopedExpr t tyenv e ->
+    ExprTyped t tyenv e ->
     localenv_sound tyenv l ->
     exists a, ExprYields t l e a.
 Proof.
@@ -201,11 +201,11 @@ Qed.
 
 Lemma StmtStepsPreserves :
   forall tyenv h l s,
-    VarsScopedStmt tyenv s ->
+    StmtTyped tyenv s ->
     localenv_sound tyenv l ->
     forall h' l' s',
        StmtSteps h l s h' l' s' ->
-          VarsScopedStmt tyenv s' /\
+          StmtTyped tyenv s' /\
           localenv_sound tyenv l'.
 Proof.
   intros.
@@ -249,7 +249,7 @@ Admitted.
 
 Lemma StmtStepsProgress:
   forall tyenv h l s,
-    VarsScopedStmt tyenv s ->
+    StmtTyped tyenv s ->
     localenv_sound tyenv l ->
     s <> s_skip ->
     (forall p arg, s = s_start p arg -> False) ->
@@ -297,7 +297,7 @@ Definition ThreadStateSound tyenv t :=
    match t with
    | thread (stack_empty) => False
    | thread (stack_frame loc stk s) =>
-        VarsScopedStmt tyenv s /\
+        StmtTyped tyenv s /\
         localenv_sound tyenv loc (* /\
         stack_sound tyenv stk *)
    end.

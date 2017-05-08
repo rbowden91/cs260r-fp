@@ -1065,6 +1065,22 @@ should constrain the heap state to adhere to the lock invariants of held locks
 may be written as: $\not (CP \implies \not L^C)$;
 that is, we cannot derive a violation of $L^C$ given that $CP$ holds.
 If $CP \implies CP'$ then $CP'$ will also meet this stipulation!
+Similarly, it indicates that the normal pre-condition should not be
+strengthened using the rule of consequence to the point that it can
+prove $\not CP$.
+(Adherence of the normal pre-condition to the conditions set by the
+crash pre-condition is given as a condition on the heap $P /\ CP$, but
+under the rule of inference ``material implication,''
+we can see that $P /\ CP$ corresponds to $\not (P \implies \not CP)$,
+similar to the form of ``crash pre-condition adherence to lock invariants''
+stated above.)
+Since the assumptions and conclusions made about the heap
+in the soundness execution invariant both constrain the heap to obey
+$P /\ CP$, we expect that $P$ and $CP$ must share a heap footprint.
+This explains the form of the more granular frame rule suggested,
+which by ensuring that the same address is framed out of both the
+normal and crash pre-conditions would make certain that
+the footprints of the crash and normal pre-conditions are kept in sync.
 
 \section{Implementation}
 \label{sec:imp}

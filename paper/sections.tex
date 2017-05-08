@@ -4,7 +4,7 @@ file system consistency, both during regular operation and in the event of
 an unexpected crash. While a handful of verified file systems have been
 developed in the past few years, none of them support fully concurrent file
 system write operations. In this work, we introduce concurrent crash Hoare
-logic as a means of reasoning about system correctness in the presence of
+logic (CCHL) as a means of reasoning about system correctness in the presence of
 of both concurrency and crashes. We have implemented the logic in Coq proof
 assistant and have begun proving it sound according to the semantics of an
 imperative language with locks, heap, and disk operations. We intend to use
@@ -109,7 +109,7 @@ In the remainder of this paper we first discuss related work
 (Section~\ref{sec:relwork}), then introduce the language and the
 small-step operational semantics we use as a basis (Section~\ref{sec:semantics}).
 In Section~\ref{sec:logic} we describe the program logic.
-Then in Section~\ref{sec:eval} we discuss our examples and an
+Then in Section~\ref{sec:imp} we discuss our implementation, example, and an
 evaluation of the usefulness of the logic.
 Finally we discuss future work (Section~\ref{sec:future}) and in
 Section~\ref{sec:conclusions} conclude.
@@ -1062,17 +1062,37 @@ Our language, semantics, and logic have been formalized in the Coq
 proof assistant.
 There is also a type system for the language, as discussed above.
 
-As of this writing we have partial proofs of the soundness of the type
-system (which serves mostly to validate the semantics) but not much in
-the way of proof that CCSHL is sound with respect to the semantics yet.
-There are some examples using the logic under construction.
-\XXX{update this}
+As of this writing we have partial proofs of the soundness of the type system
+(which serves mostly to validate the semantics), and a proof outline for the
+soundness of the logic with respect to the semantics, as described above.
 
+We have used CCHL to (mostly) verify a simple example of a lock protecting a
+counter.  The lock's strong invariant requires that the counter is always even
+(whenever we store into the counter, this property is verified). The lock's weak
+invariant requires that the counter is exactly $4$ (only on lock release is this
+property re-verified). The program acquires the lock, reads in the counter's
+current value, adds two to that value and stores it back into the counter (thus
+respecting the strong invariant but violating the weak invariant), subtracts two
+from the new value and stores it back into the counter (again respecting the
+strong invariant and restoring the weak invariant), and then releases the lock
+(which succeeds, since the weak invariant holds again).
 
-\section{Example and Evaluation}
-\label{sec:eval}
+Proving this simple example correct was surprisingly nontrivial. First, the
+logic had to be adjusted several times, not to fix bugs, but rather to try to
+write the rules in such a way that made it easy for Coq to handle. Several rules
+create existential variables because of the possibility of a program variable
+getting overwritten, and so the example was rewritten in single static
+assignment (SSA) form to avoid the existentials. Constructing the correct frame
+rules is a miserable process when the the pre-condition contains a growing
+number of assertions (Props) at each step.
 
-\XXX{write this}
+Even with the bit of pre-existing machinery that using VST separation algebra
+provides, much more automation (in the form of Ltac) is necessary before using
+CCHL will be tolerable. That said, seeing as how VST has managed to construct
+impressive tactics that make proving C programs relatively painless, we believe
+that this should be possible.
+
+Section\ref{sec:future}.
 
 % usefulness
 % useability

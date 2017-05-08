@@ -75,9 +75,12 @@ persistent state during operation (``crash conditions'') to the
 precondition of the recovery procedure, and the postcondition of the
 recovery procedure (``recovery conditions'') to the preconditions for
 normal operations.
-The full specification of a file system includes recovery conditions
-that describe the guarantees made to applications about the state of
-files and other file system objects after a crash occurs.
+The full specification of a file system includes recovery conditions that
+describe the guarantees made to applications about the state of files and other
+file system objects after a crash occurs.\footnote{\
+That said, we have not yet
+gotten to the point of formalizing recovery conditions for a concurrent file
+system in CCHL}.
 
 Chen et al.~\cite{chen2015using} introduced the concept of \emph{crash
 Hoare logic} for reasoning about persistent state in the presence of
@@ -566,7 +569,6 @@ Note that these are the pre-form and post-form of the crash
 condition (the condition that must be true when crashing), and in
 particular the ``crash post-condition'' is not the post-condition of
 crashing, or of crashing and recovering.
-\XXX{do we discuss recovery conditions anywhere?}
 This terminology could be construed as confusing.
 % but it's what we've gotten into.
 % (also it might be worth mentioning somewhere that confusion between

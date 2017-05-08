@@ -194,15 +194,16 @@ Inductive StmtSteps: Heap -> Locals -> stmt ->
      ExprYields type loc e a ->
      StmtSteps h loc (s_assign (mkvar type id) e)
                h (NatMap.add id a loc) s_skip
-| step_load: forall h loc type lid e hid whichheap a,
-     ExprYields type loc e (v_addr (mkaddr type hid whichheap)) ->
-     heap_get_data whichheap hid h = Some a ->
-     StmtSteps h loc (s_load (mkvar type lid) e)
+| step_load: forall h loc t lid e heapaddr whichheap a,
+     ExprYields (t_addr t) loc e (v_addr (mkaddr t heapaddr whichheap)) ->
+     heap_get_data whichheap heapaddr h = Some a ->
+     StmtSteps h loc (s_load (mkvar t lid) e)
                h (NatMap.add lid a loc) s_skip
-| step_store: forall h loc type lid e hid whichheap a,
-     ExprYields type loc e a ->
-     ExprYields type loc (e_read (mkvar type lid)) (v_addr (mkaddr type hid whichheap)) ->
-     StmtSteps h loc (s_store (mkvar type lid) e)
+| step_store: forall h loc lid hid whichheap e t'a a,
+     ExprYields t'a loc e a ->
+     ExprYields (t_addr t'a) loc (e_read (mkvar (t_addr t'a) lid))
+                                 (v_addr (mkaddr t'a hid whichheap)) ->
+     StmtSteps h loc (s_store (mkvar (t_addr t'a) lid) e)
                (heap_set_data whichheap hid a h) loc s_skip
 | step_if_true: forall h loc e st sf,
      ExprYields t_bool loc e v_true ->

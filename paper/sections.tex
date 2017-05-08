@@ -1071,14 +1071,14 @@ Similarly, it indicates that the normal pre-condition should not be
 strengthened using the rule of consequence to the point that it can
 prove $\neg CP$.
 (Adherence of the normal pre-condition to the conditions set by the
-crash pre-condition is given as a condition on the heap $P /\ CP$, but
+crash pre-condition is given as a condition on the heap $P \wedge CP$, but
 under the rule of inference ``material implication,''
-we can see that $P /\ CP$ corresponds to $\neg (P \implies \neg CP)$,
+we can see that $P \wedge CP$ corresponds to $\neg (P \implies \neg CP)$,
 similar to the form of ``crash pre-condition adherence to lock invariants''
 stated above.)
 Since the assumptions and conclusions made about the heap
 in the soundness execution invariant both constrain the heap to obey
-$P /\ CP$, we expect that $P$ and $CP$ must share a heap footprint.
+$P \wedge CP$, we expect that $P$ and $CP$ must share a heap footprint.
 This explains the form of the more granular frame rule suggested,
 which by ensuring that the same address is framed out of both the
 normal and crash pre-conditions would make certain that

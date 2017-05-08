@@ -977,10 +977,24 @@ be sure that the new value being stored at the heap address does not violate any
 strong invariants associated with that heap
 address in our current crash condition.
 
+\section{Implementation}
+\label{sec:imp}
+
+Our language, semantics, and logic have been formalized in the Coq
+proof assistant.
+There is also a type system for the language, as discussed above.
+
+As of this writing we have partial proofs of the soundness of the type
+system (which serves mostly to validate the semantics) but not much in
+the way of proofs of the logic soundness yet.
+There are some examples using the logic under construction.
+\XXX{update this}
+
+
 \section{Example and Evaluation}
 \label{sec:eval}
 
-Our logic has been formalized in the Coq proof assistant.
+\XXX{write this}
 
 % usefulness
 % useability
@@ -990,19 +1004,19 @@ Our logic has been formalized in the Coq proof assistant.
 
 % XXX Lemma about strong invariants always holding??
 
-The final goal is to use our concurrent crash Hoare logic to prove data-race
-freedom and functional correctness of a concurrent crash file system.
+The final goal is to use our concurrent crash Hoare logic to prove
+functional correctness and crash safety
+of a concurrent file system.
 But first,
-we still need to fully prove the logic sound according to the semantics of our
-imperative language.
+we still need to fully prove the logic sound with respect to our
+semantics of our imperative language.
 
-That said, our logic and language must be extended in multiple ways to more
+That said, our language and logic must be extended in multiple ways to more
 fully model a concurrent file system.
-First, it is necessary to add in a
+First, we need a
 permission model to allow for multiple readers of a heap address.
-For file
-system purposes, this is strictly necessary in order to reason about multiple
-concurrent threads sharing pointers to the same locks.
+Otherwise key file system objects that are shared among many or all
+threads (like vnodes) cannot be handled properly.
 
 Additionally, our language does not currently include any dynamic heap
 allocation, including malloc, free, lock creation, and lock deletion.
@@ -1010,7 +1024,7 @@ These are
 necessary to be able to correctly model operations such as file system mount and
 unmount.
 A fundamental issue is that, traditionally, dynamic locks introduce the
-aforementioned issue of ``predicates on the heap''.
+issue of ``predicates on the heap'' mentioned earlier.
 Once locks are dynamic and
 predicates are placed on the heap, we lose the power to reason about what global
 invariants a program must abide by, and as such can no longer reason about a
@@ -1018,16 +1032,21 @@ consistent state for recovery to act upon.
 
 We have toyed with the idea that a solution to this problem is to give each lock
 an explicit type, and all locks of a given type must share the same resource
-invariant (parameterized by the address of the resource that the lock is
-protecting).
-That way, we no longer have predicates on the heap, and the
+invariant, parameterized by the address of the resource that the lock is
+protecting.
+For example, all vnode locks would share the same invariant, as
+applied to the individual vnode they protect.
+This seems like a reasonable proposition from a programming standpoint.
+In this case, we no longer have predicates on the heap, and the
 $(L^c,L^r)$ mapping to the left of $\vDash$, parameterized by both lock type and
-address, once again contains all possible strong invariants. Here, the strong
+address, once again contains all possible strong invariants.
+Here, the strong
 invariants associated with each lock type would constitute the global invariants
 the program adheres to.
 
-As mentioned earlier, there is an alternative frame rule that combines the two
-frame rules that we currently have that we have not yet implemented.
+As mentioned earlier, there is an alternative frame rule we have not
+yet implemented that combines the two
+frame rules we currently have.
 A related
 issue is that any resource pulled into the pre-condition must also be pulled
 into the crash pre-condition, though the actual constraints (weak vs.\ strong)
@@ -1049,17 +1068,35 @@ rule that can frame anything out of the current state, since framing out an
 address automatically frames out both the strong and weak invariants associated
 with it.
 
-As an aside, it might have been possible to avoid making the language completely
-imperative by just extending FSCQ's disk read and write operations with lock and
-heap operations.
-It was only recently we realized it made sense to restrict
-crash resource invariants to only describe precisely the resource that the lock
-protects.
-The fundamental concurrent crash Hoare logic remains the same, but we
-could potentially use Coq values directly.
+% I don't believe in this. - dholland
+% We'd still need to have threads, so what you save is basically that
+% you can write monad bind in place of s_seq, and I'm not convinced
+% that's helpful or maybe even desirable.
+%
+%As an aside, it might have been possible to avoid making the language completely
+%imperative by just extending FSCQ's disk read and write operations with lock and
+%heap operations.
+%It was only recently we realized it made sense to restrict
+%crash resource invariants to only describe precisely the resource that the lock
+%protects.
+%The fundamental concurrent crash Hoare logic remains the same, but we
+%could potentially use Coq values directly.
+
+An additional set of complications, that pertain mostly to the
+language and not the logic, is that in order to have abstract compound
+objects like vnodes, we need to extend the type system of our language
+with at least record types and maybe other things.
+Going back to a model where we can use arbitrary Coq values as program
+values would eliminate this requirement (and was one of the primary
+motivations for wanting to do that)... but in the long run we would
+like to be able to extract the file system written in our language,
+compile it to C (or something of the sort) and run it outside of Coq;
+that requires not depending directly on Coq internal phenomena.
 
 \section{Conclusions}
 \label{sec:conclusions}
+
+\XXX{Lorem ipsum conclaudio splognathi quivando pl\"opp.}
 
 \appendix
 \section{Language}

@@ -106,16 +106,16 @@ Lemma stmt_step_sound :
       (* heap meets preconditions *)
       P locals (heap_lookup (mkheap mem lk disk)) ->
       (* heap also meets lock invariants globally *)
-      (forall a l,
+      (forall a l t,
           heap_lookup (mkheap mem lk disk) a = Some (v_lock l) ->
-          crash_inv (v_lock l) lk_invs (heap_lookup (mkheap mem lk disk))) ->
+          crash_inv t l lk_invs (heap_lookup (mkheap mem lk disk))) ->
       forall heap' locals' s',
         StmtStepsMany (mkheap mem lk disk) locals s heap' locals' s' ->
         (* the strong invariant of any lock on the heap is satisfied *)
         (* XXX this should be *ing them together, or maybe we need to go intuitionistic *)
-        forall a l,
+        forall a l t,
           heap_lookup heap' a = Some (v_lock l) ->
-          crash_inv (v_lock l) lk_invs (heap_lookup heap').
+          crash_inv t l lk_invs (heap_lookup heap').
 Admitted.
 
 
@@ -145,9 +145,9 @@ Lemma thread_step_sound :
         ThreadStepsMany (mkheap mem lk disk) (thread (stack_frame locals stack_empty s))
                         heap' s' ->
         (* the strong invariant of any lock on the heap is satisfied *)
-        forall a l,
+        forall a l t,
           heap_lookup heap' a = Some (v_lock l) ->
-          crash_inv (v_lock l) lk_invs (heap_lookup heap').
+          crash_inv t l lk_invs (heap_lookup heap').
 Admitted.
 
 (* TODO: machine steps soundness

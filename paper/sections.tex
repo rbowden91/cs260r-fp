@@ -1,7 +1,17 @@
 \begin{abstract}
-{\it
-\XXX{Lorem ipsum abstract adipiscing dolor amet sit yogurt.}
-}
+Formal verification of file systems is critical to ensure data integrity and
+file system consistency, both during regular operation and in the event of
+an unexpected crash. While a handful of verified file systems have been
+developed in the past few years, none of them support fully concurrent file
+system write operations. In this work, we introduce concurrent crash Hoare
+logic as a means of reasoning about system correctness in the presence of
+of both concurrency and crashes. We have implemented the logic in Coq proof
+assistant and have begun proving it sound according to the semantics of an
+imperative language with locks, heap, and disk operations. We intend to use
+this language to implement a fully concurrent file system that supports
+buffered writes and an asynchronous disk, and we will then use concurrent
+crash Hoare logic to prove this file system correct according to specifications
+that we have already begun forming.
 \end{abstract}
 
 \section{Introduction}
@@ -33,13 +43,13 @@ techniques.
 
 To reason about the correctness of a file system one must reason both
 about transient in-memory state and persistent on-disk state.
-Crashes (arising for example from power failures, hardware faults,
+Crashes (arising for example from power failures, hardware faults, or
 kernel panics in unverified components) erase the transient state.
 This includes data in the kernel's buffer cache and, with modern
 disks, potentially also unwritten data cached within the disk itself.
 This can happen at any time and after any step of execution; unlike
 when reasoning about, for example,
-interrupts (already difficult enough) it is not possible to
+interrupts (already difficult enough), it is not possible to
 block crashes in order to execute a critical section.
 
 Reasoning about state in the presence of uncontrollable external
@@ -254,12 +264,11 @@ frame-rulable crash invariants.
 They use their logic to reason about
 ARIES~\cite{ntzik2015fault}, a write-ahead logging recovery algorithm.
 However,
-their logic rules differ from our own \XXX{how? that's the point of
-having this here}, and they do not demonstrate an actual
+their logic rules differ from our own, aligning much more closely with
+regular concurrent separation logic. Furthermore, they do not demonstrate an actual
 implementation of their logic or proofs in code.
-We are interested in the
-relationship between our own concurrent crash Hoare logic and their
-fault-tolerant resource reasoning.
+It is not immediately clear to us how their rules relate to our own, and we are
+interested in looking into the relationship further.
 
 The Verified Software Toolchain~\cite{appel2014program} is an ongoing effort to
 allow for functional verification of real C code in Coq that can be immediately
@@ -954,8 +963,6 @@ the input argument and the return value.
 
 \subsection{Crash-preserving rules}
 
-% XXX is disk model changing by removing the bool?
-
 Ultimately, the only statement of our language whose corresponding Hoare rule
 needs to be checked against the current crash condition is ``store''.
 In our
@@ -1167,7 +1174,8 @@ that requires not depending directly on Coq internal phenomena.
 \section{Conclusions}
 \label{sec:conclusions}
 
-\XXX{Lorem ipsum conclaudio splognathi quivando pl\"opp.}
+We have introduced concurrent crash Hoare logic to modularly reason about system
+correctness in the presence of both concurrency and crashes. \XXX{finish}
 
 \appendix
 \section{Language}

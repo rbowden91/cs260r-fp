@@ -61,8 +61,7 @@ Definition mapsto (x:addr) (y:value) : pred world :=
 .
 
 Definition ex_mapsto (x:addr) : pred world :=
- fun w =>
-    exists v, w x = Some v
+ EX v:value, mapsto x v
 .
 
 (* Original mapsto:
@@ -100,11 +99,21 @@ Function eval_expr (e : expr) (rho : Locals) : value :=
     | Some val => val
     | None => v_undef
     end
+  | e_getlockaddr _ e =>
+    match eval_expr e rho with
+    | v_lock a => v_addr a
+    | _ => v_undef
+    end
   | e_value ty v => v
   | e_cond ty b e1 e2 =>
     match eval_expr b rho with
     | v_bool true => eval_expr e1 rho
     | v_bool false => eval_expr e2 rho
+    | _ => v_undef
+    end
+  | e_natbinop f e1 e2 =>
+    match (eval_expr e1 rho, eval_expr e2 rho) with
+    | (v_nat n1, v_nat n2) => v_nat (f n1 n2)
     | _ => v_undef
     end
   end
@@ -128,13 +137,10 @@ Function typeof_expr (e : expr) (rho : Locals) (t : type) : Prop :=
                 | None => False
                 | Some _ => type_of_var v = t
                 end
-  | e_value ty v => ty = t (* XXX? typeof_val v t *)
-  | e_cond ty eb e1 e2 => ty = t
-(* XXX?
-    typeof_expr eb rho t_bool /\
-    typeof_expr e1 rho t /\
-    typeof_expr e2 rho t
-*)
+  | e_natbinop _ _ _ => t_nat = t
+  | e_value ty _ => ty = t 
+  | e_getlockaddr ty _ => ty = t
+  | e_cond ty _ _ _ => ty = t
   end.
 
 (* XXX this is a preserved invariant --- move to a soundness file *)
@@ -157,28 +163,16 @@ Notation ar_emp := (fun (_ : value) => fun (_ : value) => emp).
 
 Local Open Scope logic.
 
-Definition assign_forward (v : var) (e : expr) (P : assertion) (rho : Locals) := 
-  EX old:value,
-    (!!(get_locals rho v = Some (eval_expr e (set_locals v old rho)))
-    && P (set_locals v old rho)).
-
-Definition assign_forward_load (v : var) (a:value) (ptr:addr) (e : expr) (P : assertion) (rho : Locals) := 
-  !!(get_locals rho v = Some a) && EX old:value, (
-     !!(eval_expr e (set_locals v old rho) = v_addr ptr)
-     && mapsto ptr a
-     && P (set_locals v old rho)).
-
-
 (* XXX make this an option (pred world * pred world)? Some kind of type checking
        on the address? We want to keep t_lock t_nat and t_nat in different address
        spaces. *)
-Notation lk_inv_map := (value -> pred world * pred world).
+Notation lk_inv_map := (type -> addr -> pred world * pred world).
 
-Definition crash_inv (lk:value) (lk_invs : lk_inv_map) :=
-  fst (lk_invs lk).
+Definition crash_inv (lktype:type) (resource:addr) (lk_invs : lk_inv_map) :=
+  fst (lk_invs lktype resource).
 
-Definition reg_inv (lk:value) (lk_invs : lk_inv_map) :=
-  snd (lk_invs lk).
+Definition reg_inv (lktype:type) (resource:addr) (lk_invs : lk_inv_map) :=
+  snd (lk_invs lktype resource).
 
 Inductive hoare_stmt :
   (value -> pred world) -> (* retC *)
@@ -223,14 +217,21 @@ Inductive hoare_stmt :
              hoare_stmt retC ret lk_invs
                         C P (s_while e_b s) C (fun rho => P rho && !!(eq (v_bool false) (eval_expr e_b rho)))
 
-| ht_assign : forall retC ret lk_invs,
-              forall C P v e,
+| ht_assign : forall {retC ret lk_invs},
+              forall {C P v e},
+              P |-- (fun rho => !!(typeof_expr e rho (type_of_var v))) ->
               hoare_stmt retC ret lk_invs
-                           C
-                           (fun rho => P rho && !!(typeof_expr e rho (type_of_var v)))
+                           C P
                              (s_assign v e)
-                           (assign_forward v e C)
-                           (assign_forward v e P)
+                           C (fun rho =>
+                              !!(get_locals rho v = Some (eval_expr e rho))
+                              && P rho)
+(* XXX For now, SSA. We'll just write a transformation to enforce that. *)
+(*
+                           C (EX old:value, (fun rho =>
+                              !!(get_locals rho v = Some (eval_expr e (set_locals v old rho)))
+                              && P (set_locals v old rho)))
+*)
 
 (* XXX special frame for PC and QC. Also, this seems to weakly constrain the old rv... *)
 (* XXX XXX XXX Just force rv to be a new var for now... *)
@@ -261,59 +262,65 @@ Inductive hoare_stmt :
                                        Q (eval_expr e (table_set rv old rho)) val))
 *)
 
-| ht_getlock : forall retC ret lk_invs,
-               forall v a lk, (* XXX should this go as an EX? *)
+| ht_getlock : forall {retC ret lk_invs},
+               forall {v P C},
+               forall lkptr lktype,
+               P |-- (fun rho => !!(type_of_var v = t_addr (t_lock lktype))) ->
+               P |-- (fun rho => !!(get_locals rho v = Some (v_addr lkptr))) ->
+               (fun rho => ex_mapsto lkptr) |-- C ->
                hoare_stmt retC ret lk_invs
-                          (fun rho => emp)
-                          (fun rho => EX t:type, (!!(type_of_var v = t_addr (t_lock t))
-                                      && !!(get_locals rho v = Some (v_addr a))
-                                      && mapsto a lk))
+                          C (fun rho => P rho * ex_mapsto lkptr)
                             (s_getlock v)
-                          (fun rho => crash_inv lk lk_invs)
-                          (fun rho => EX t:type, (!!(type_of_var v = t_addr (t_lock t))
-                                      && !!(get_locals rho v = Some (v_addr a))
-                                      && mapsto a lk * reg_inv lk lk_invs))
+                          (EX resource:addr, (fun rho => C rho * mapsto lkptr (v_lock resource) * crash_inv lktype resource lk_invs))
+                          (EX resource:addr, (fun rho => P rho * mapsto lkptr (v_lock resource) * reg_inv lktype resource lk_invs))
 
 | ht_putlock : forall retC ret lk_invs,
-               forall v a lk, (* XXX should this go as an EX? *)
+               forall v lkptr lk lktype resource,
                hoare_stmt retC ret lk_invs
-                          (fun rho => crash_inv lk lk_invs)
-                          (fun rho => EX t:type, (!!(type_of_var v = t_addr (t_lock t))
-                                      && !!(get_locals rho v = Some (v_addr a))
-                                      && mapsto a lk * reg_inv lk lk_invs))
+                          (fun rho => mapsto lkptr lk * crash_inv lktype resource lk_invs)
+                          (fun rho => !!(type_of_var v = t_addr (t_lock lktype))
+                                      && !!(get_locals rho v = Some (v_addr lkptr))
+                                      && !!(lk = v_lock resource)
+                                      && mapsto lkptr lk
+                                      * reg_inv lktype resource lk_invs)
                             (s_putlock v)
-                          (fun rho => emp)
-                          (fun rho => EX t:type, (!!(type_of_var v = t_addr (t_lock t))
-                                      && !!(get_locals rho v = Some (v_addr a))
-                                      && mapsto a lk))
+                          (fun rho => mapsto lkptr lk)
+                          (fun rho => !!(type_of_var v = t_addr (t_lock lktype))
+                                      && !!(get_locals rho v = Some (v_addr lkptr))
+                                      && !!(lk = v_lock resource)
+                                      && mapsto lkptr lk)
 
+(* XXX Also SSA *)
 | ht_load : forall {retC ret lk_invs},
             forall {P C e v},
-            forall a ptr,
+            forall ptr,
+            P |-- (fun rho => !!(typeof_expr e rho (t_addr (type_of_var v)))) ->
+            P |-- (fun rho => !!(eval_expr e rho = v_addr ptr)) ->
             hoare_stmt retC ret lk_invs
-                           C
-                           (fun rho => P rho && !!(typeof_expr e rho (t_addr (type_of_var v)))
-                                       && !!(eval_expr e rho = v_addr ptr)
-                                       * mapsto ptr a)
+                           C (fun rho => P rho * ex_mapsto ptr)
                               (s_load v e)
-                           (assign_forward_load v a ptr e C)
-                           (assign_forward_load v a ptr e P)
+                          C
+                          (EX a:value, (fun rho =>
+                             !! (get_locals rho v = Some a)
+                             && P rho
+                             * mapsto ptr a))
+                 
 
 | ht_store : forall {retC ret lk_invs},
             forall {P C e v},
             forall ptr t val,
+            P |-- !!(type_of_var v = t_addr t) ->
+            P |-- (fun rho => !!(typeof_expr e rho t)) ->
+            P |-- (fun rho => !!(get_locals rho v = Some (v_addr ptr))) ->
+            P |-- (fun rho => !!(eval_expr e rho = val)) ->
+            (fun rho => P rho && mapsto ptr val) |-- C ->
             hoare_stmt retC ret lk_invs
                            C
-                           (fun rho => P rho && !!(type_of_var v = t_addr t)
-                                       && !!(typeof_expr e rho t)
-                                       && !!(get_locals rho v = Some (v_addr ptr))
-                                       && !!(eval_expr e rho = val)
-                                       * ex_mapsto ptr)
+                           (fun rho => P rho && ex_mapsto ptr)
                               (s_store v e)
                            C
-                           (fun rho => P rho && !!(type_of_var v = t_addr t)
-                                       && !!(get_locals rho v = Some (v_addr ptr))
-                                       * mapsto ptr val)
+                           (fun rho => P rho && mapsto ptr val)
+
 (* XXX First, we can pass off crash conditions in the same way we frame them.
        Second, locks need to be able to be split. *)
 (* XXX I blithely inserted decls in the mkproc without thinking, please fix *)
@@ -336,6 +343,7 @@ Inductive hoare_stmt :
                               PC P s QC Q ->
                    (forall rho, PC rho |-- PC' rho) -> 
                    (forall rho, QC' rho |-- QC rho) -> 
+                   (* XXX should we need to enforce that this doesn't violate the crash condition? *)
                    (forall rho, P' rho |-- P rho) ->
                    (forall rho, Q rho |-- Q' rho) ->
                    hoare_stmt retC ret lk_invs
@@ -349,17 +357,29 @@ Inductive hoare_stmt :
              hoare_stmt retC ret lk_invs
                         PC (fun rho => (P rho) * (R rho)) s QC (fun rho => (Q rho) * (R rho))
 
-(* XXX Don't have to frame out other locks due to the resource invariant! *)
 | ht_frame_lock : forall retC ret lk_invs,
-                  forall PC QC P Q s a l,
+                  forall PC QC P Q s lkptr lktype n h lk resource,
                   hoare_stmt retC ret lk_invs
                              PC P s QC Q ->
                   hoare_stmt retC ret lk_invs
-                             (fun rho => (PC rho) * crash_inv l lk_invs)
-                             (fun rho => (P rho) * reg_inv l lk_invs * mapsto a l) 
+                             (fun rho => mapsto lkptr lk
+                                         * crash_inv lktype resource lk_invs
+                                         * PC rho)
+                             (fun rho => !!(lk = v_lock resource)
+                                         && !!(resource = mkaddr lktype n h)
+                                         && mapsto lkptr lk
+                                         * reg_inv lktype resource lk_invs
+                                         * P rho)
                                  s
-                             (fun rho => (QC rho) * crash_inv l lk_invs)
-                             (fun rho => (Q rho) * reg_inv l lk_invs * mapsto a l)
+                             (fun rho => mapsto lkptr lk
+                                         * crash_inv lktype resource lk_invs
+                                         * QC rho)
+                             (fun rho => !!(lk = v_lock resource)
+                                         && !!(resource = mkaddr lktype n h)
+                                         && mapsto lkptr lk
+                                         * reg_inv lktype resource lk_invs
+                                         * Q rho)
+
 
 (* XXX semax_extract_prop? *)
 
@@ -391,6 +411,23 @@ Notation "'Return-Crash:' retC 'Return:' ret 'Lock-Invs:' lk_invs 'Pre-Crash:' P
 
 Notation "{{{ lk_invs }}} {{{ PC }}} {{{ P }}} p {{{ QC }}} {{{ Q }}}" :=
   (hoare_proc lk_invs PC P p QC Q) (at level 90, p at next level).
+
+Lemma ht_getlock_noex : forall {retC ret lk_invs},
+   forall {v P C},
+   forall lkptr lktype a,
+   P |-- (fun rho => !!(type_of_var v = t_addr (t_lock lktype))) ->
+   P |-- (fun rho => !!(get_locals rho v = Some (v_addr lkptr))) ->
+   P |-- (fun rho => !!(eval_expr (t_addr lktype) (e_getlockaddr lk) ->
+   (fun rho => ex_mapsto lkptr) |-- C ->
+   hoare_stmt retC ret lk_invs
+              C (fun rho => P rho * mapsto lkptr lk)
+                (s_getlock v)
+              (fun rho => C rho * mapsto lkptr (v_lock a)
+                                * crash_inv lktype a lk_invs)
+              (fun rho => P rho * mapsto lkptr (v_lock a)
+                                * reg_inv lktype a lk_invs).
+Proof.
+Admitted.
 
 Lemma ht_pc_consequence : forall retC ret lk_invs PC PC' P s QC Q,
   PC |-- PC' ->
@@ -537,9 +574,380 @@ Proof.
   apply ht_skip.
 Qed.
 
-Definition lock_nat_even := 
-  mkproc t_nat (mkvar (t_addr (t_lock t_nat)) 0) [] ([{
-    s_skip ;
-    s_skip ;
-    s_skip
+Definition lne_lkptr := (mkvar (t_addr (t_lock t_nat)) 0).
+
+(* XXX need to fix list vardecls *)
+Definition lock_nat_even :=
+  let lk := (mkvar (t_lock t_nat) 1) in
+  let counterptr := (mkvar (t_addr t_nat) 2) in
+  let counter1 := (mkvar (t_nat) 3) in
+  let counter2 := (mkvar (t_nat) 4) in
+  let counter3 := (mkvar (t_nat) 5) in
+  let add2 v := (e_natbinop (fun x => fun y => x + y)
+                           (e_read v) (e_value t_nat (v_nat 2))) in
+  let minus2 v := (e_natbinop (fun x => fun y => x - y)
+                           (e_read v) (e_value t_nat (v_nat 2))) in
+
+  mkproc t_nat lne_lkptr [] ([{
+    (* Ugh, framing out the lock is annoying, so just load first instead... *)
+    s_load lk (e_read lne_lkptr) ;
+    s_assign counterptr (e_getlockaddr (t_addr t_nat) (e_read lk)) ;
+    s_getlock lne_lkptr ;
+    s_load counter1 (e_read counterptr) ;
+    s_assign counter2 (add2 counter1) ;
+    s_store counterptr (e_read counter2) ;
+    s_assign counter3 (minus2 counter2) ;
+    s_store counterptr (e_read counter3) ;
+    s_putlock lne_lkptr
   }]).
+
+Inductive even : nat -> Prop :=
+  | even_O : even 0
+  | even_S : forall n, odd n -> even (S n)
+with odd : nat -> Prop :=
+    odd_S : forall n, even n -> odd (S n).
+
+Definition lne_lkinvs :=
+  fun (t : type) => fun (a : addr) =>
+    match t with
+    | t_nat => ((ex_mapsto a && (fun (w : world) =>
+                   match (w a) with
+                   | Some (v_nat n) => even n
+                   | _ => False
+                   end)),
+                 (ex_mapsto a && fun (w : world) =>
+                   match (w a) with
+                   | Some (v_nat n) => n = 4
+                   | _ => False
+                   end))
+    | _ => (fun (w : world) => False, fun (w : world) => False)
+    end.
+
+Lemma mapsto_imp_ex_mapsto: forall ptr target w,
+  mapsto ptr target w -> ex_mapsto ptr w.
+Proof.
+  intros.
+  unfold ex_mapsto.
+  exists target.
+  unfold mapsto.
+  inversion H.
+  destruct H0.
+  unfold mapsto in H.
+  apply H. (* XXX this all should be auto'd somehow. *)
+Qed.
+
+Lemma lift_exists : forall CR R L CP s CQ Q A P,
+  (forall (a:A), hoare_stmt CR R L CP (P a) s CQ Q) ->
+  hoare_stmt CR R L CP (EX a:A, (P a)) s CQ Q.
+Admitted.
+
+(*
+Lemma lock_nat_even_sound : forall lkptr,
+  {{{ lne_lkinvs }}}
+  {{{ (fun a =>
+        ex_mapsto lkptr)
+  }}}
+  {{{ (fun a =>
+        !!(a = v_addr lkptr)
+        && ex_mapsto lkptr)
+  }}}
+    lock_nat_even
+  {{{ (fun a => fun r =>
+        ex_mapsto lkptr)
+  }}}
+  {{{ (fun a => fun r =>
+        !!(a = v_addr lkptr)
+        && ex_mapsto lkptr)
+  }}}.
+Proof.
+  intro; unfold example2; apply ht_proc; intros.
+  unfold lne_lkptr.
+  unfold type_of_var.
+  eapply ht_seq.
+  apply ht_p_consequence with (P:=(fun rho : Locals =>
+       !! typeof_val a (t_addr (t_lock t_nat)) &&
+       !! (get_locals rho (mkvar (t_addr (t_lock t_nat)) 0) = Some a) &&
+       !! (a = v_addr lkptr) * ex_mapsto lkptr)).
+  intro. normalize. rewrite sepcon_comm. normalize.
+
+  eapply ht_load; intro; normalize.
+  unfold typeof_expr; rewrite H0; unfold type_of_var; auto.
+  unfold eval_expr; rewrite H0; auto.
+
+  (* Need to do this *before* the eapply *)
+  apply lift_exists; intro.
+
+  eapply ht_seq.
+
+  eapply ht_assign.
+  intro; normalize.
+  unfold type_of_var.
+  unfold typeof_expr.
+  repeat intro; unfold prop; simpl; auto.
+
+  eapply ht_seq.
+  eapply ht
+
+  
+
+  unfold eval_expr. unfold e_getlockaddr.
+  eapply ht_getlock_noex.
+  po
+
+
+
+
+
+
+
+
+
+
+
+
+(* XXX the below is from before changing to SSA. *)
+Lemma lock_nat_even_sound' : forall lkptr,
+  {{{ lne_lkinvs }}}
+  {{{ (fun a =>
+        ex_mapsto lkptr)
+  }}}
+  {{{ (fun a =>
+        !!(a = v_addr lkptr)
+        && ex_mapsto lkptr)
+  }}}
+    lock_nat_even
+  {{{ (fun a => fun r =>
+        ex_mapsto lkptr)
+  }}}
+  {{{ (fun a => fun r =>
+        !!(a = v_addr lkptr)
+        && ex_mapsto lkptr)
+  }}}.
+Proof.
+  intro; unfold example2; apply ht_proc; intros.
+  unfold lne_lkptr.
+  unfold type_of_var.
+  eapply ht_seq.
+  apply ht_p_consequence with (P:=(fun rho : Locals =>
+       !! typeof_val a (t_addr (t_lock t_nat)) &&
+       !! (get_locals rho (mkvar (t_addr (t_lock t_nat)) 0) = Some a) &&
+       !! (a = v_addr lkptr) * ex_mapsto lkptr)).
+  intro. normalize. rewrite sepcon_comm. normalize.
+
+  eapply ht_load; intro; normalize.
+  unfold typeof_expr; rewrite H0; unfold type_of_var; auto.
+  unfold eval_expr; rewrite H0; auto.
+
+  (* Need to do this *before* the eapply *)
+  apply lift_exists; intro.
+  apply lift_exists; intro.
+
+  eapply ht_seq.
+  apply ht_p_consequence with (P:=(fun rho : Locals =>
+       !! (eval_expr (e_read (mkvar (t_addr (t_lock t_nat)) 0))
+             (set_locals (mkvar (t_lock t_nat) 1) a0 rho) = v_addr lkptr) &&
+       (!! typeof_val a (t_addr (t_lock t_nat)) &&
+        !! (get_locals (set_locals (mkvar (t_lock t_nat) 1) a0 rho)
+              (mkvar (t_addr (t_lock t_nat)) 0) = Some a) &&
+        !! (a = v_addr lkptr)) *
+       !! (get_locals rho (mkvar (t_lock t_nat) 1) = Some a1) *
+       ex_mapsto lkptr)).
+  intro. normalize.
+  rewrite sepcon_prop_prop.
+  rewrite sepcon_left_corable; normalize.
+  destruct H2.
+  rewrite sepcon_comm.
+  intro.
+  intro.
+  inversion H4.
+  unfold ex_mapsto.
+  destruct H5.
+  exists x0. exists x1.
+  destruct H5. destruct H6.
+  repeat split; auto.
+  exists a1. apply H7. (* XXX WHY WAS THIS SO ANNOYING *)
+
+  eapply ht_getlock.
+  instantiate (1:=t_nat).
+  (* XXX some kind of type soundness. Ignore. *)
+  admit.
+
+  intro; normalize.
+  repeat intro.
+  (* don't feel like finding the relevant NatMap lemmas rn *)
+  assert ( get_locals x
+       (mkvar (t_addr (t_lock t_nat)) 0) = Some a) by admit.
+  rewrite H3.
+  inversion H2.
+  destruct H4. destruct H4. destruct H5. inversion H5. simpl. auto. (* really gotta figure out how to pull things out... *)
+  intro. intro. intro. exists a. auto.
+
+  apply lift_exists.
+  intro.
+
+  eapply ht_seq.
+  eapply ht_assign.
+  intro.
+  normalize.
+  unfold typeof_expr.
+  unfold type_of_var.
+  repeat intro. normalize. simpl; auto.
+  apply lift_exists.
+  intro.
+  instantiate (1:=v_undef).
+  eapply ht_seq.
+  unfold reg_inv, crash_inv, lne_lkinvs, fst, snd.
+  
+  unfold ex_mapsto.
+
+  eapply ht_load.
+
+  intro.
+  normalize.
+
+  unfold get_locals.
+  unfold get_locals, set_locals in H1.
+  
+  rewrite H1.
+
+  try repeat intro.
+  unfold typeof_expr. rewrite H0. simpl. auto.
+  unfold eval_expr.
+  rewrite H0. normalize.
+
+  unfold assign_forward_load.
+
+  apply ht_p_consequence with (P:=fun rho : Locals =>
+             !! (get_locals rho (mkvar (t_lock t_nat) 1) = Some ?a) &&
+             (EX old : value,
+              !! (eval_expr (e_read (mkvar (t_addr (t_lock t_nat)) 0))
+                    (set_locals (mkvar (t_lock t_nat) 1) old rho) =
+                  v_addr lkptr) && mapsto lkptr ?a && ex_mapsto lkptr)).
+  intro.
+  normalize.
+  rewrite sepcon_comm.
+  normalize.
+  eapply ht_getlock; intro; normalize.
+  eapply ht_seq.
+  
+
+  instantiate (1:=lkptr).
+
+  rewrite sepcon_left_corable in H1; normalize.
+  normalize in H1.
+  destruct H1; auto.
+
+  rewrite sepcon_left_corable; normalize.
+
+  unfold reg_inv, lne_lkinvs, snd.
+
+  intro.
+  intro.
+
+  (* XXX some kind of typechecking here? This is madness... *)
+  (*
+  simpl in H1.
+  unfold predicates_sa.prop in H1.
+  inversion H1.
+  destruct H2.
+  destruct H2.
+  destruct H3.
+  destruct H3.
+  destruct H3.
+  destruct H3.
+  destruct H5.
+  simpl in H6.
+  remember (x3 resource) as r.
+  destruct r; try contradiction.
+  destruct v; try contradiction.
+  *)
+
+  assert ((mapsto lkptr (v_lock resource) *
+      (fun w : world =>
+       match w resource with
+       | Some v_unit => False
+       | Some (v_nat n) => n = 4
+       | Some (v_bool _) => False
+       | Some (v_pair _ _) => False
+       | Some (v_list _ _) => False
+       | Some (v_addr _) => False
+       | Some (v_lock _) => False
+       | Some v_undef => False
+       | None => False
+       end) * TT)%logic a) by admit.
+
+
+
+ normalize.
+
+  normalize.
+
+  destruct (x3 resource).
+  destruct t.
+  unfold TT in H1.
+  unfold prop in H1.
+
+    simpl in H1.
+
+  unfold ex_mapsto. intro. intro.
+  exists (v_lock resource).
+  unfold reg_inv, lne_lkinvs in H1.
+  unfold snd in H1.
+  assert (type_of resource = t_nat).
+
+
+  rewrite <- sepcon_left_corable in H1; normalize in H1.
+  rewrite sepcon_comm in H1;
+  rewrite sepcon_left_corable in H1; normalize in H1.
+  
+
+  eapply ht_load; intro; normalize.
+  Search (_ * _ = _ && _).
+
+ inversion H1. destruct H1. intro. intro.
+  unfold type_of_var.
+  unfold typeof_expr.
+  rewrite H0.
+  unfold type_of_var.
+  normalize. simpl. auto.
+
+  try repeat intro.
+  unfold eval_expr.
+  rewrite H0.
+  simpl. auto.
+
+  eapply ht_seq.
+  unfold assign_forward_load.
+  intro.
+  eapply ht_getlock.
+
+  try repeat intro.
+   
+
+  instantiate (1:=(mkvar (t_addr (t_lock t_nat)) 0)).
+  unfold typeof_val in H. simpl in H.
+  unfold type_of_var.
+  eapply ht_getlock with (lkptr0:=lkptr).
+  intro.
+  repeat apply andp_right; normalize.
+  instantiate (1:=lk).
+ normalize.
+  try repeat intro.
+  destruct H. destruct H0. destruct H.
+  repeat split; normalize.
+  simpl.
+
+  admit.
+  
+  
+  intro.
+  intro.
+  intro.
+  split.
+  auto.
+  unfold prop.
+  simpl.
+  inversion H.
+  unfold ex_mapsto.
+  exists x0.
+*)

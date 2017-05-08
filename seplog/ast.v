@@ -82,8 +82,10 @@ Inductive invariant : Type :=
  *)
 Inductive expr: Type :=
 | e_value: type -> value -> expr
+| e_getlockaddr : type -> expr -> expr
 | e_read: var -> expr
 | e_cond: type -> expr -> expr -> expr -> expr
+| e_natbinop: (nat -> nat -> nat) -> expr -> expr -> expr
 .
 
 (*

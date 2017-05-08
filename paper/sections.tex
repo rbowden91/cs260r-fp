@@ -536,7 +536,8 @@ so none are exhibited in the Appendix.
 \label{sec:logic}
 
 \subsection{Notation}
-Because the language is imperative, we are able to take some inspiration from
+
+Because out language is imperative, we are able to take some inspiration from
 the Verified Software Toolchain for the Hoare logic rules.
 On the one hand, we
 are able to simplify, since we do not have to support the broader C semantics
@@ -545,33 +546,43 @@ On the other, we need to extend the logic to support both
 concurrency and crash conditions.
 
 A Hoare judgement for a statement of our language is a septuple of the form:
-
-$$\hoarestmt{(R^c,R^r)}{(L^c,L^r)}{CP}{P}{s}{Q}{CQ}$$
+\begin{equation*}
+\hoarestmt{(R^c,R^r)}{(L^c,L^r)}{CP}{P}{s}{Q}{CQ}
+\end{equation*}
 
 $P$ and $Q$ are the pre- and post-conditions, respectively, of the statement
 $s$, as in traditional Hoare logic.
 $CP$ and $CQ$, on the other hand, are the
 crash pre-condition and crash post-condition.
-\footnote{Calling it the ``crash
-post-condition'' seems to imply that that is the state of the world after a
-crash, but that is not right.
-Nevertheless, its what we have become accustomed
-to calling it, as it is analogous to FSCQ's single crash condition.}
-The crash
-pre-condition and crash post-condition are really statements about invariants.
-The crash pre-condition states that every step taken in $s$ respects the
-invariants specified in $CP$.
-The crash post-condition states that, after $s$
-completes, future steps of the program must continue to abide by the invariants
-in $CQ$.
-Importantly, $CP$ and $CQ$ \textit{do not} have to be the same; $s$
-can modify them.
-$(L^c,L^r)$ and $(R^c,R^r)$ are described in the Lock rules
-and Return rule subsection, respectively.
-We will denote them with the
-contracted notation $L$ and $R$ when the components are not being discussed.
+
+Note that these are the pre-form and post-form of the crash
+condition (the condition that must be true when crashing), and in
+particular the ``crash post-condition'' is not the post-condition of
+crashing, or of crashing and recovering.
+\XXX{do we discuss recovery conditions anywhere?}
+This terminology could be construed as confusing.
+% but it's what we've gotten into.
+% (also it might be worth mentioning somewhere that confusion between
+% crash conditions and recovery conditions got us in a mess early on)
+
+The crash condition (which in FSCQ appears as a single condition) is a
+statement about invariants.
+Every step taken must preserve the crash condition.
+In particular, the crash pre-condition demands that every step taken
+in $s$ preserves the invariants in $CP$.
+The crash post-condition allows $s$ to demand that every step taken
+after $s$ completes abides by the invariants in $CQ$.
+These are potentially separate (and different) because $s$ might do
+things that affect what crash invariants must be considered.
+
+$(L^c,L^r)$ and $(R^c,R^r)$ are described in the ``Lock rules'' subsection
+(\ref{sec:lockrules}) and and ``Procedure rules'' subsection
+(\ref{sec:procrules}), respectively.
+We will write these as just $L$ and $R$ except when directly
+discussing the individual components.
 
 \subsection{Lock rules}
+\label{sec:lockrules}
 
 How can a statement take in an invariant that is supposed to hold at every step
 of execution, and ultimately require a \textit{different} invariant after it
@@ -605,13 +616,13 @@ invariant that is pulled into and out of the crash pre-condition and
 post-condition, and $L^r$ is the traditional map from a lock to its associated
 weak invariant that is pulled into and out of the regular pre-condition and
 post-condition.
-Given all this, the rules for lock acquisition and release
-become what is written in Figure~\ref{fig:locks}.
-\footnote{Notice that we avoid
+Given all this, the rules for lock acquisition and release\footnote{
+Notice that we avoid
 having to discuss the storage of invariants in the heap.
 Instead, analogously
 to locks in C, we just need to have a pointer to the lock in our heap in order
 to acquire and release it.}
+become what is written in Figure~\ref{fig:locks}.
 
 \begin{figure*}
 \begin{gather*}
@@ -677,7 +688,7 @@ for the lock, but that would still imply that the lock is always allocated.
 This is fine in our current world where we do not have dynamic memory or lock
 operations, but is an issue once those are added into the language.
 See the
-future work section for a discussion on our proposed solution to this issue.}
+future work section for a discussion of our proposed solution to this issue.}
 % another wording than the ``mapping of the lock'' perhaps
 
 A more granular rule is expected to remain sound.
@@ -721,8 +732,8 @@ and constraints, which still allows for acquisition of the lock.
 
 We intend to switch to (a form of) the alternative frame rule, but we currently
 have implemented the two separate frame rules.
-See the future work discussion
-for why the frame rule (and more fundamentally the shape of our Hoare triple)
+See Section \ref{sec:future} for a discussion
+of why the frame rule (and more fundamentally the shape of our Hoare triple)
 might still change further, whereas we expect (but have not yet proven) that
 our two current frame rules are sound.
 
@@ -772,26 +783,27 @@ our two current frame rules are sound.
 % XXX strengthening invariants dynamically
 
 Ignoring separation logic and crash post-conditions for a moment, if we
-currently have crash pre-condition $CP'=A \wedge B$, under what circumstances
-can we execute a statement $s$ with pre-condition $CP$? We can clearly do so if
-$CP=CP'$.
-What if $CP=A$? Then statement $s$ does not adhere to invariant $B$,
+currently have crash pre-condition $\mathit{CP}'=A \wedge B$, under what circumstances
+can we execute a statement $s$ with pre-condition $\mathit{CP}$? We can clearly do so if
+$\mathit{CP}=\mathit{CP}'$.
+What if $\mathit{CP}=A$? Then statement $s$ does not adhere to invariant $B$,
 and we cannot execute it.
-On the other hand, if $CP=A \wedge B \wedge C$, then
+On the other hand, if $\mathit{CP}=A \wedge B \wedge C$, then
 $s$ adheres to a superset of the invariants that we need, and we can
 proceed.
 In
-general, we can execute $s$ if $CP \imp CP'$.
+general, we can execute $s$ if $\mathit{CP} \imp \mathit{CP}'$.
 
-Now focusing on crash post-conditions, we have crash post-condition $Q'=A \wedge
-B$, and statement $s$ has crash post-condition $Q$.
-If $Q=A \wedge B \wedge C$,
+Now focusing on crash post-conditions, we have crash post-condition
+$\mathit{CQ}'=A \wedge B$, and statement $s$ has crash post-condition
+$\mathit{CQ}$.
+If $\mathit{CQ}=A \wedge B \wedge C$,
 then $s$ requires that future steps adhere to $C$, which we do not promise to
 adhere to.
-On the other hand, if $Q=A$, then $s$ requires that all future steps
+On the other hand, if $\mathit{CQ}=A$, then $s$ requires that all future steps
 adhere only to $A$, which is a subset of what we already intended to adhere to
 after this step.
-In general, we can execute $s$ if $CQ \imp CQ'$.
+In general, we can execute $s$ if $\mathit{CQ} \imp \mathit{CQ}'$.
 
 The full rule of consequence, combined with that of traditional Hoare logic, is
 as shown in Figure~\ref{fig:consequence}.
@@ -810,8 +822,9 @@ rules!
 \end{figure*}
 
 In traditional Hoare logic, a Hoare triple cannot be established for a sequence
-where the second statement has a pre-condition of False (unless the first
-statement was able to establish a post-condition of False).
+where the second statement has a pre-condition of False.
+(Unless the first
+statement was able to establish a post-condition of False.)
 Similarly, having
 proven a Hoare triple with a post-condition of False means we can sequence with
 a statement that has any other pre-condition (and thus prove anything), because
@@ -834,10 +847,11 @@ supports \textit{all} possible invariants.
 For example, an operation that does
 not modify any state can have a crash pre-condition of False.
 
-If a statement's crash pre-condition is $emp$, then that asserts and requires
-that its heap is permanently empty (the only way we could add something to the
+If a statement's crash pre-condition is $\mathit{emp}$, then that asserts and requires
+that its heap is permanently empty.
+(The only way we could add something to the
 heap is by acquiring a lock, which would require having access to something on
-the heap in the first place).
+the heap in the first place.)
 This could be useful for specifying completely
 pure functions that do not touch the heap.
 
@@ -853,7 +867,8 @@ On the other hand, if the statement's crash post-condition is False, we can
 never execute another statement (unless the next statement's crash
 post-condition is also False).
 
-Finally, if the statement's crash post-condition is $emp$, the heap must remain
+Finally, if the statement's crash post-condition is $\mathit{emp}$,
+the heap must remain
 empty after the statement returns.
 This is not strictly permanent, though,
 since we could always have framed out part of the heap prior to executing the
@@ -865,13 +880,13 @@ Take the rule for the \texttt{skip}
 statement as an example:
 
 \begin{gather*}
-    \infer{\hoarestmt{R}{L}{CP}{P}{\texttt{skip}}{P}{CP}}{}
+    \infer{\hoarestmt{R}{L}{\mathit{CP}}{P}{\texttt{skip}}{P}{\mathit{CP}}}{}
 \end{gather*}
 
 If the current state of our judgement looks like:
 
 \begin{gather*}
-\infer{\hoarestmt{R}{L}{True}{False}{\texttt{skip}}{Q}{CQ}}{}
+\infer{\hoarestmt{R}{L}{\mathit{True}}{\mathit{False}}{\texttt{skip}}{Q}{\mathit{CQ}}}{}
 \end{gather*}
 
 (which is a very possible state after applying the Return Rule, described in the
@@ -884,16 +899,17 @@ using the rule of consequence.
 But to make the crash conditions match, we go in
 the opposite direction.
 We use the rule of consequence on the crash
-\textit{post-condition} to bring the state from $CQ$ to True.
+\textit{post-condition} to bring the state from $\mathit{CQ}$ to True.
 Now we can apply
-the skip rule with $P=Q$ and $CP=True$, and we are all set.
+the skip rule with $P=Q$ and $\mathit{CP}=True$, and we are all set.
 
 \subsection{Procedure rules}
+\label{sec:procrules}
 
 In our language, a statement can call another procedure and can return from
 within a procedure.
 Ultimately, a procedure judgement is of roughly the form:
-$$\hoareproc{L}{CP}{P}{\texttt{proc}(s, e)}{Q}{CQ}$$
+$$\hoareproc{L}{\mathit{CP}}{P}{\texttt{proc}(s, e)}{Q}{\mathit{CQ}}$$
 This is to say, a procedure with body $s$ with takes $e$ as an argument must
 satisfy the specified pre- and post-conditions given the (global) lock
 invariants.
@@ -902,7 +918,7 @@ judgements.
 In order to prove the procedure judgement sound, we just need to
 prove that statement $s$ satisfies:
 \begin{gather*}
-\hoarestmt{(CQ(e),Q(e))}{L}{CP(e)}{P(e)}{s}{False}{True}
+\hoarestmt{(\mathit{CQ}(e),Q(e))}{L}{\mathit{CP}(e)}{P(e)}{s}{\mathit{False}}{\mathit{True}}
 \end{gather*}
 
 First, the procedure's conditions are all parameterized by the input argument.
@@ -917,8 +933,8 @@ rest of the procedure, which is often just ``skip'').
 The return rule takes the form:
 
 \begin{gather*}
-    \infer{\hoarestmt{(R^c,R^r)}{L}{CP}{P}{\texttt{return}(e)}{False}{True}}
-	  {R^c(e) \imp CP & P \imp R^r(e)}
+    \infer{\hoarestmt{(R^c,R^r)}{L}{\mathit{CP}}{P}{\texttt{return}~e}{\mathit{False}}{\mathit{True}}}
+	  {R^c(e) \imp \mathit{CP} & P \imp R^r(e)}
 \end{gather*}
 
 $(R^c,R^r)$ came directly from the crash and regular post-conditions of the
@@ -942,22 +958,24 @@ the input argument and the return value.
 
 % XXX is disk model changing by removing the bool?
 
-Ultimately, the only statement of our language whose corresponding hoare rule
+Ultimately, the only statement of our language whose corresponding Hoare rule
 needs to be checked against the current crash condition is ``store''.
 In our
 model, the disk is represented as a parallel version of the heap that can
 ultimately hold arbitrary values.
-Disk asynchronicity can be represented, for
+A modern disk's internal write-back cache can be represented, for
 example, by storing lists at each disk address, where the head of the list gives
 the most recent value written to disk, and the tail represents potential values
 that could appear on disk following a crash if the disk is not explicitly synced.
-The list can be trimmed to the single head element on a disk sync.
+The list can be trimmed to the single head element on a disk-level sync.
+(This could also be used to handle the operating system buffer cache,
+but that is more appropriately modeled explicitly.)
 
 On a store, in addition to the regular concurrent separation logic rules
-requiring that the address is currently mapped in our heaplet, we just need to
+requiring that the address is currently mapped in our accessible heap, we just need to
 be sure that the new value being stored at the heap address does not violate any
-strong invariants in our current crash condition associated with that heap
-address.
+strong invariants associated with that heap
+address in our current crash condition.
 
 \section{Example and Evaluation}
 \label{sec:eval}

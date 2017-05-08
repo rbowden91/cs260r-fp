@@ -2,7 +2,11 @@ COQC=coqc
 COQDEP=coqdep
 COQFLAGS=-R VST/msl msl -R VST/veric veric -R VST/compcert compcert
 
-SRCS=ast.v varmap.v typing.v semantics.v fo_seplogic.v typingproofs.v
+SRCS=\
+	ast.v varmap.v \
+	semantics.v typing.v oldtyping.v \
+	fo_seplogic.v \
+	typingproofs.v oldtypingproofs.v
 # table.v (deprecated)
 
 .SUFFIXES: .v .vo

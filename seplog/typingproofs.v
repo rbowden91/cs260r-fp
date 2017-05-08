@@ -215,21 +215,21 @@ Proof.
     apply IHStmtSteps in H5; auto.
     destruct H5 as [H5a H5b].
     split; auto.
-    apply vars_scoped_seq; auto.
+    apply s_seq_typed; auto.
   - inversion H; subst.
     split; auto.
   - split.
-    { apply vars_scoped_skip. }
+    { apply s_skip_typed. }
     inversion H1; subst.
     apply localenv_sound_replacement with (t := type); auto.
     apply ExprYieldsPreserves with (tyenv := tyenv) (l := loc) (e := e); auto.
   - split.
-    { apply vars_scoped_skip. }
+    { apply s_skip_typed. }
     inversion H2; subst.
     apply localenv_sound_replacement with (t := type); auto.
     admit. (* currently don't have types from heap values *)
   - split.
-    { apply vars_scoped_skip. }
+    { apply s_skip_typed. }
     inversion H2; subst; auto.
   - inversion H1; subst.
     split; auto.
@@ -237,10 +237,10 @@ Proof.
     split; auto.
   - inversion H1; subst.
     split; auto.
-    apply vars_scoped_seq; auto.
+    apply s_seq_typed; auto.
   - inversion H1; subst.
     split; auto.
-    apply vars_scoped_skip.
+    apply s_skip_typed.
 Admitted.
 
 (*

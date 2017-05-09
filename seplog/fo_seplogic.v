@@ -263,41 +263,42 @@ Inductive hoare_stmt :
 *)
 
 | ht_getlock : forall {retC ret lk_invs},
-               forall {v P C},
+               forall {v P P' C},
                forall lkptr lktype,
                P |-- (fun rho => !!(type_of_var v = t_addr (t_lock lktype))) ->
                P |-- (fun rho => !!(get_locals rho v = Some (v_addr lkptr))) ->
+               P' |-- (fun rho => ex_mapsto lkptr) -> (* XXX this should be exact. can also include P' above *)
                (fun rho => ex_mapsto lkptr) |-- C ->
                hoare_stmt retC ret lk_invs
-                          C (fun rho => P rho * ex_mapsto lkptr)
+                          C (fun rho => P rho * P' rho)
                             (s_getlock v)
                           (EX resource:addr, (fun rho => C rho * mapsto lkptr (v_lock resource) * crash_inv lktype resource lk_invs))
                           (EX resource:addr, (fun rho => P rho * mapsto lkptr (v_lock resource) * reg_inv lktype resource lk_invs))
 
 | ht_putlock : forall retC ret lk_invs,
-               forall v lkptr lk lktype resource,
+               forall {P P' v C},
+               forall lkptr lk lktype resource,
+               P |-- (fun rho => !!(type_of_var v = t_addr (t_lock lktype))) ->
+               P |-- (fun rho => !!(get_locals rho v = Some (v_addr lkptr))) ->
+               P |-- (fun rho => !!(lk = v_lock resource)) ->
+               P' |-- (fun rho => mapsto lkptr lk * reg_inv lktype resource lk_invs) ->
+               C |-- (fun rho => ex_mapsto lkptr * crash_inv lktype resource lk_invs) ->
                hoare_stmt retC ret lk_invs
-                          (fun rho => mapsto lkptr lk * crash_inv lktype resource lk_invs)
-                          (fun rho => !!(type_of_var v = t_addr (t_lock lktype))
-                                      && !!(get_locals rho v = Some (v_addr lkptr))
-                                      && !!(lk = v_lock resource)
-                                      && mapsto lkptr lk
-                                      * reg_inv lktype resource lk_invs)
+                          C
+                          (fun rho => P rho * P' rho)
                             (s_putlock v)
-                          (fun rho => mapsto lkptr lk)
-                          (fun rho => !!(type_of_var v = t_addr (t_lock lktype))
-                                      && !!(get_locals rho v = Some (v_addr lkptr))
-                                      && !!(lk = v_lock resource)
-                                      && mapsto lkptr lk)
+                          (fun rho => ex_mapsto lkptr)
+                          (fun rho => P rho * mapsto lkptr lk)
 
 (* XXX Also SSA *)
 | ht_load : forall {retC ret lk_invs},
-            forall {P C e v},
+            forall {P C e v P'},
             forall ptr,
             P |-- (fun rho => !!(typeof_expr e rho (t_addr (type_of_var v)))) ->
             P |-- (fun rho => !!(eval_expr e rho = v_addr ptr)) ->
+            P' |-- (fun rho => ex_mapsto ptr) -> (* XXX *)
             hoare_stmt retC ret lk_invs
-                           C (fun rho => P rho * ex_mapsto ptr)
+                           C (fun rho => P rho * P' rho)
                               (s_load v e)
                           C
                           (EX a:value, (fun rho =>
@@ -307,19 +308,20 @@ Inductive hoare_stmt :
                  
 
 | ht_store : forall {retC ret lk_invs},
-            forall {P C e v},
+            forall {P C e v P'},
             forall ptr t val,
-            P |-- !!(type_of_var v = t_addr t) ->
-            P |-- (fun rho => !!(typeof_expr e rho t)) ->
-            P |-- (fun rho => !!(get_locals rho v = Some (v_addr ptr))) ->
-            P |-- (fun rho => !!(eval_expr e rho = val)) ->
+            (fun rho => P rho * P' rho) |-- !!(type_of_var v = t_addr t) ->
+            (fun rho => P rho * P' rho)  |-- (fun rho => !!(typeof_expr e rho t)) ->
+            (fun rho => P rho * P' rho)  |-- (fun rho => !!(get_locals rho v = Some (v_addr ptr))) ->
+            (fun rho => P rho * P' rho)  |-- (fun rho => !!(eval_expr e rho = val)) ->
+            P' |-- (fun rho => ex_mapsto ptr) -> (* XXX *)
             (fun rho => P rho && mapsto ptr val) |-- C ->
             hoare_stmt retC ret lk_invs
                            C
-                           (fun rho => P rho && ex_mapsto ptr)
+                           (fun rho => P rho * P' rho)
                               (s_store v e)
                            C
-                           (fun rho => P rho && mapsto ptr val)
+                           (fun rho => P rho * mapsto ptr val)
 
 (* XXX First, we can pass off crash conditions in the same way we frame them.
        Second, locks need to be able to be split. *)
@@ -573,10 +575,23 @@ Proof.
   apply ht_skip.
 Qed.
 
-Definition lne_lkptr := (mkvar (t_addr (t_lock t_nat)) 0).
+(* Make this notation so that it shows up like this in the proffs... *)
+Notation lne_lkptr := (mkvar (t_addr (t_lock t_nat)) 0).
+Notation lk := (mkvar (t_lock t_nat) 1).
+Notation counterptr := (mkvar (t_addr t_nat) 2).
+Notation counter1 := (mkvar (t_nat) 3).
+Notation counter2 := (mkvar (t_nat) 4).
+Notation counter3 := (mkvar (t_nat) 5).
+Notation add2 v := (e_natbinop (fun x => fun y => x + y)
+                           (e_read v) (e_value t_nat (v_nat 2))).
+Notation minus2 v := (e_natbinop (fun x => fun y => x - y)
+                           (e_read v) (e_value t_nat (v_nat 2))).
+
 
 (* XXX need to fix list vardecls *)
 Definition lock_nat_even :=
+(*
+  let lne_lkptr := (mkvar (t_addr (t_lock t_nat)) 0) in
   let lk := (mkvar (t_lock t_nat) 1) in
   let counterptr := (mkvar (t_addr t_nat) 2) in
   let counter1 := (mkvar (t_nat) 3) in
@@ -586,7 +601,7 @@ Definition lock_nat_even :=
                            (e_read v) (e_value t_nat (v_nat 2))) in
   let minus2 v := (e_natbinop (fun x => fun y => x - y)
                            (e_read v) (e_value t_nat (v_nat 2))) in
-
+*)
   mkproc t_nat lne_lkptr [] ([{
     (* Ugh, framing out the lock is annoying, so just load first instead... *)
     s_load lk (e_read lne_lkptr) ;
@@ -597,7 +612,8 @@ Definition lock_nat_even :=
     s_store counterptr (e_read counter2) ;
     s_assign counter3 (minus2 counter2) ;
     s_store counterptr (e_read counter3) ;
-    s_putlock lne_lkptr
+    s_putlock lne_lkptr ;
+    s_return (e_value t_nat (v_nat 0))
   }]).
 
 Inductive even : nat -> Prop :=
@@ -660,7 +676,6 @@ Lemma lock_nat_even_sound : forall lkptr,
   }}}.
 Proof.
   intro; unfold example2; apply ht_proc; intros.
-  unfold lne_lkptr.
   unfold type_of_var.
   eapply ht_seq.
   apply ht_p_consequence with (P:=(fun rho : Locals =>
@@ -685,7 +700,228 @@ Proof.
   repeat intro; unfold prop; simpl; auto.
 
   eapply ht_seq.
+
+  (* XXX annoying parenthesization issue *)
+  eapply ht_p_consequence with (P:=(fun rho : Locals =>
+       (!! (get_locals rho (mkvar (t_addr t_nat) 2) =
+           Some
+             (eval_expr
+                (e_getlockaddr (t_addr t_nat)
+                   (e_read (mkvar (t_lock t_nat) 1))) rho)) &&
+       (!! (get_locals rho (mkvar (t_lock t_nat) 1) = Some a0) &&
+        (!! typeof_val a (t_addr (t_lock t_nat)) &&
+         !! (get_locals rho (mkvar (t_addr (t_lock t_nat)) 0) = Some a) &&
+         !! (a = v_addr lkptr))) * mapsto lkptr a0))); normalize.
+  intro.
+  normalize.
+
+  eapply ht_getlock.
+  instantiate (1:=t_nat).
+  intro.
+  normalize.
+  intro. normalize.
+  instantiate (1:=lkptr). normalize.
+
+  intro; normalize.
+  intro.
+  apply mapsto_imp_ex_mapsto.
+
+  intro. normalize.
+  apply lift_exists. intro.
+  eapply ht_seq.
+  eapply ht_load; intro; normalize.
+  unfold typeof_expr.
+  rewrite H.
+  unfold type_of_var.
+  repeat intro; simpl; auto.
+  unfold eval_expr. rewrite H.
+  unfold eval_expr. rewrite H0.
+
+  (* XXX Type soundness ugh... *)
+  intro. intro.
+  apply tt_sound in H0.
+  unfold typeof_val in H0. unfold type_of_var in H0.
+  destruct a0; try discriminate; try contradiction.
+  destruct a0; try discriminate.
+  (* XXX need some kind of "read some value from heap twice returns
+         same thing twice" lemma *)
+  instantiate (1:=a1).
+  admit.
+  unfold reg_inv; unfold snd. unfold lne_lkinvs.
+
+  intro.
+  rewrite andp_comm.
+  normalize.
+  destruct H.
+  auto.
+
+  apply lift_exists.
+  intro.
+
+  eapply ht_seq.
+  eapply ht_assign; intro; normalize.
+
+  unfold typeof_expr. unfold type_of_var.
+  repeat intro; simpl; auto.
+
+  eapply ht_seq.
+
+  (* XXX more parenthesization issues... *)
+  apply ht_p_consequence with (P:=(fun rho : Locals =>((
+       !! (get_locals rho counter2 = Some (eval_expr (add2 counter1) rho)) &&
+       (!! (get_locals rho counter1 = Some a2) &&
+        (!! (get_locals rho counterptr =
+             Some (eval_expr (e_getlockaddr (t_addr t_nat) (e_read lk)) rho)) &&
+         (!! (get_locals rho lk = Some a0) &&
+          (!! typeof_val a (t_addr (t_lock t_nat)) &&
+           !! (get_locals rho lne_lkptr = Some a) && !! (a = v_addr lkptr))) *
+         mapsto lkptr (v_lock a1))))) * mapsto a1 a2)).
+  intro; normalize.
+
+  (* type soundness *)
+  assert (exists n1, a2 = v_nat n1) by admit.
+  assert (exists a, a0 = v_lock a) by admit.
+  destruct H. destruct H0.
+  assert (a1 = x0) by admit. (* lost this somewhere *)
+
+  eapply ht_store; intro; subst; normalize;
+
+  unfold eval_expr; unfold typeof_expr; unfold type_of_var.
+  instantiate (1:=t_nat).
+  repeat intro; simpl; auto.
+
+  rewrite H.
+  repeat intro; simpl; auto.
+
+  rewrite H1.
+  unfold eval_expr.
+  rewrite H2.
+  instantiate (1:=a1).
+  repeat intro; simpl; auto.
+
+  rewrite H.
+  unfold eval_expr.
+  rewrite H0.
+  instantiate (1:=a). (* XXX this is wrong!!! have to figure out how to make coq happy *)
+  (* XXX same double-heap-read issue as above *)
+  admit.
+
+  intro; apply mapsto_imp_ex_mapsto.
+
+  intro. intro.
+
+  unfold eval_expr.
+  unfold crash_inv.
+  unfold fst. unfold lne_lkinvs.
+  exists x0.
+  admit.
+
+  eapply ht_seq.
+  eapply ht_assign.
+  intro; normalize. unfold typeof_expr. unfold type_of_var.
+  repeat intro; simpl; auto.
+
+  eapply ht_seq.
+
+  (* Parentheses weeeee *)
+  apply ht_p_consequence with (P:=fun rho : Locals =>
+       !! (get_locals rho counter3 = Some (eval_expr (minus2 counter2) rho)) &&
+       (!! (get_locals rho counter2 = Some (eval_expr (add2 counter1) rho)) &&
+        (!! (get_locals rho counter1 = Some a2) &&
+         (!! (get_locals rho counterptr =
+              Some (eval_expr (e_getlockaddr (t_addr t_nat) (e_read lk)) rho)) &&
+          (!! (get_locals rho lk = Some a0) &&
+           (!! typeof_val a (t_addr (t_lock t_nat)) &&
+            !! (get_locals rho lne_lkptr = Some a) && !! (a = v_addr lkptr))) *
+          mapsto lkptr (v_lock a1)))) * mapsto a1 a). intro; normalize.
+
+  (* XXX another store, so alllll the same issues as above *)
+  assert (exists n1, a2 = v_nat n1) by admit.
+  assert (exists a, a0 = v_lock a) by admit.
+  destruct H. destruct H0.
+  assert (a1 = x0) by admit.
+
+  eapply ht_store; intro; normalize;
+  unfold eval_expr; unfold typeof_expr; unfold type_of_var.
+
+  instantiate (1:=t_nat).
+  repeat intro; simpl; auto.
+
+  rewrite H2.
+  repeat intro; simpl; auto.
+
+  instantiate (1:=a1).
+  rewrite H5.
+  unfold eval_expr.
+  rewrite H6.
+  rewrite H0.
+  rewrite H1.
+  repeat intro; simpl; auto.
+  rewrite H2.
+  unfold eval_expr.
+  rewrite H3.
+  unfold eval_expr.
+  rewrite H4.
+  rewrite H.
+  assert (x = x + 2 - 2) by omega.
+  rewrite <- H9.
+  instantiate (1:=a2).
+  repeat intro; simpl; auto.
+
+  intro; apply mapsto_imp_ex_mapsto.
+  repeat intro.
+  exists a1. admit.
+  eapply ht_seq.
+
+  (* parensss *)
+  apply ht_p_consequence with (P:=(fun rho : Locals =>
+       !! (get_locals rho counter3 = Some (eval_expr (minus2 counter2) rho)) &&
+       (!! (get_locals rho counter2 = Some (eval_expr (add2 counter1) rho)) &&
+        (!! (get_locals rho counter1 = Some a2) &&
+         (!! (get_locals rho counterptr =
+              Some (eval_expr (e_getlockaddr (t_addr t_nat) (e_read lk)) rho)) &&
+          (!! (get_locals rho lk = Some a0) &&
+           (!! typeof_val a (t_addr (t_lock t_nat)) &&
+            !! (get_locals rho lne_lkptr = Some a) && !! (a = v_addr lkptr)))))) *
+          mapsto lkptr (v_lock a1) * mapsto a1 a2)).
+  intro; normalize.
+
+  assert (exists n1, a = v_addr n1) by admit.
+  destruct H.
+
+  eapply ht_putlock; intro; normalize;
+  unfold eval_expr; unfold type_of_var; unfold typeof_expr; subst.
+  instantiate (1:=t_nat).
+  repeat intro; simpl; auto.
+
+  rewrite H6.
+  instantiate (1:=lkptr).
+  rewrite sepcon_left_corable; normalize.
+  rewrite H.
+  repeat intro; simpl; auto.
+  instantiate (1:=a1).
+  instantiate (1:=a0).
+  admit.
+  
+  unfold reg_inv; unfold snd; unfold lne_lkinvs.
+  (* Ugh, need the other props here... *)
+  admit. admit.
+
+  eapply ht_seq.
+  eapply ht_return.
+  intro; normalize.
+  intro; normalize.
+  rewrite sepcon_assoc.
+  rewrite sepcon_left_corable; normalize.
+  (* somehow I got two lkptrs starred together ........ *)
+  admit.
+
+  eapply ht_skip.
 Admitted.
+
+
+
+
 (*
   eapply ht
 
@@ -951,4 +1187,3 @@ Proof.
   inversion H.
   unfold ex_mapsto.
   exists x0.
-*)

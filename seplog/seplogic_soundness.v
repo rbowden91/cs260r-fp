@@ -79,10 +79,34 @@ Definition respects_all_invariants : predicates_sa.pred world := fun x => False 
    at blank heap or something instead of something that actually satisfies its invariants *)
             
 (* XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX *)
+
+(* heap and locals state respect preconditions and lock invariants *)
+(* THIS is what is hard to state *)
+Definition state_good (h : Heap) (rho : Locals)
+           (PC : assertion) (P : assertion) (lk_invs : lk_inv_map) : Prop := False.
+
+(* one assertion does not violate another *)
+Definition obeys (a : assertion) (b : assertion) :=
+  forall h rho, ~ (a rho (heap_lookup h) -> ~ (b rho (heap_lookup h))).
+
+(* lock at address x is held *)
+Definition held (x : addr) := False.
+
 Lemma stmt_step_sound' :
   forall retC ret lk_invs PC P s QC Q,
     hoare_stmt retC ret lk_invs PC P s QC Q ->
-    forall (h : Heap) (rho : Locals), False.
+    forall (h : Heap) (rho : Locals),
+      state_good h rho PC P lk_invs ->
+      forall h' rho' s',
+        StmtStepsMany h rho s h' rho' s' ->
+        exists PC' P', obeys P' PC' /\
+                       (forall t a,
+                           held a ->
+                           forall rho h, PC' rho h -> (crash_inv t a lk_invs) h) /\
+                       state_good h' rho' PC' P' lk_invs /\
+                       hoare_stmt retC ret lk_invs PC' P' s' QC Q.
+
+Admitted.
 
 
 (* The statement is that a hoare_stmt with some set of lock invariants lk_invs and:
@@ -95,28 +119,29 @@ Lemma stmt_step_sound' :
    will never step to a state violating a lock invariant! *)
 Lemma stmt_step_sound :
   forall lk_invs P s QC Q,
-    hoare_stmt (fun v => fun w => True) (* retC *)
-               (fun v => fun w => True) (* ret *)
+    hoare_stmt (fun v w => True) (* retC *)
+               (fun v w => True) (* ret *)
                lk_invs (* lock invariants *)
-               (fun rho => fun w => True) (* crash pre *)
+               (fun rho w => True) (* crash pre *)
                P s QC Q ->
     forall mem lk disk locals,
       (* all locks begin unlocked *)
       (forall n, NatMap.In n lk -> NatMap.find n lk = Some LockAvailable) ->
-      (* heap meets preconditions *)
-      P locals (heap_lookup (mkheap mem lk disk)) ->
-      (* heap also meets lock invariants globally *)
-      (forall a l t,
-          heap_lookup (mkheap mem lk disk) a = Some (v_lock l) ->
-          crash_inv t l lk_invs (heap_lookup (mkheap mem lk disk))) ->
+      (* heap meets precondition and lock invariants *)
+      state_good (mkheap mem lk disk) locals (fun rho w => True) P lk_invs ->
       forall heap' locals' s',
         StmtStepsMany (mkheap mem lk disk) locals s heap' locals' s' ->
+        (* ALL lock invariants are satisfied *)
+        state_good heap' locals' (fun rho w => True) (fun rho w => True) lk_invs.
+
+Admitted.
+  (*
         (* the strong invariant of any lock on the heap is satisfied *)
         (* XXX this should be *ing them together, or maybe we need to go intuitionistic *)
         forall a l t,
           heap_lookup heap' a = Some (v_lock l) ->
           crash_inv t l lk_invs (heap_lookup heap').
-Admitted.
+*)
 
 
 Inductive ThreadStepsMany : Heap -> Thread -> Heap -> Thread -> Prop :=

@@ -1187,3 +1187,4 @@ Proof.
   inversion H.
   unfold ex_mapsto.
   exists x0.
+*)
